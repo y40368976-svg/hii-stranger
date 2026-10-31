@@ -1,5 +1,8 @@
 CREATE TABLE categories (
-    id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name      TEXT NOT NULL UNIQUE,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    id        UUID NOT NULL DEFAULT gen_random_uuid(),
+    name      TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+    CONSTRAINT pk_categories PRIMARY KEY (id),
+    CONSTRAINT uq_categories_name UNIQUE (name)
 );
