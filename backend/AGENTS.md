@@ -1,283 +1,208 @@
-
-# Backend AGENTS.md — Go Engineering Rules
-
-## 1. Mission
-
-Act as a senior Go backend engineer.
-Write correct, secure, maintainable, production-ready code.
-
-Prioritize simplicity, correctness, and consistency over code volume.
-Never implement something merely to make the task appear complete.
-
-## 2. Inspect Before Coding
-
-Before changing anything:
-
-1. Read the root `AGENTS.md`.
-2. Inspect the backend directory and `go.mod`.
-3. Identify the Go version and existing dependencies.
-4. Inspect relevant handlers, services, repositories, models,
-   middleware, configuration, and tests.
-5. Follow existing architecture and naming conventions.
-6. Read relevant documentation in `rules-direction/`.
-7. Identify the root cause before fixing a bug.
-
-Never assume the project uses a specific framework, ORM,
-database, or architecture without inspecting the code.
-
-## 3. Anti-Slop Rules
-
-- Implement the smallest complete solution.
-- Do not create unnecessary files, packages, interfaces, or abstractions.
-- Do not duplicate existing functionality.
-- Do not rewrite working code without a concrete reason.
-- Do not refactor unrelated modules.
-- Do not introduce dependencies when the standard library or
-  existing dependencies are sufficient.
-- Do not create generic frameworks for a single simple use case.
-- Do not add speculative features.
-- Do not use fake data or hardcoded production responses.
-- Do not return success when an operation has failed.
-- Do not silently ignore errors.
-- Do not leave placeholder implementations in production paths.
-- Do not use global mutable state without a strong justification.
-- Do not introduce concurrency unless it solves a real problem.
-- Do not suppress tests, errors, or security checks to make a task pass.
-
-Every abstraction must have a clear, practical benefit.
-
-## 4. Architecture
-
-Follow the existing project architecture.
-
-Keep responsibilities clear:
-
-- HTTP handlers: HTTP concerns, request parsing, response formatting.
-- Business logic: domain rules and application behavior.
-- Data access: database queries and persistence.
-- Middleware: cross-cutting HTTP concerns.
-- Configuration: environment and application configuration.
-
-These are responsibility guidelines, not a requirement to create
-a separate package for every layer.
-
-Do not force clean architecture, repository patterns, dependency
-injection frameworks, or additional layers into a project
-that does not need them.
-
-Keep dependencies flowing in a clear direction.
-Avoid circular dependencies and unnecessary coupling.
-
-## 5. Go Standards
-
-- Follow idiomatic Go and the project's Go version.
-- Format changed Go files with `gofmt`.
-- Use meaningful, concise names.
-- Keep functions focused and reasonably small.
-- Prefer simple control flow over clever code.
-- Handle errors explicitly.
-- Wrap errors with `%w` when error inspection is needed.
-- Avoid excessive nesting and unnecessary abstractions.
-- Use pointers only when their semantics justify them.
-- Avoid unnecessary allocations and premature optimization.
-- Do not use `panic` for ordinary application errors.
-- Do not use `init()` for complex application setup.
-- Avoid unnecessary global variables.
-- Document exported identifiers when appropriate.
-- Do not introduce interfaces solely to make code look testable.
-- Keep public APIs minimal.
-
-## 6. Error Handling
-
-- Never discard an error without an explicit, justified reason.
-- Never replace a failed operation with a fake successful result.
-- Add context to errors when it helps identify the failing operation.
-- Preserve the original error when callers need to inspect it.
-- Avoid logging the same error repeatedly at every layer.
-- Return appropriate HTTP status codes.
-- Do not expose stack traces, SQL details, secrets, or internal
-  implementation details in public API responses.
-- Keep error response formats consistent with the existing API.
-
-## 7. HTTP API Rules
-
-- Follow existing route naming and response conventions.
-- Use appropriate HTTP methods and status codes.
-- Validate request bodies, query parameters, path parameters,
-  and relevant headers.
-- Enforce request size limits where appropriate.
-- Return clear, consistent error responses.
-- Avoid exposing internal database models directly when doing so
-  would create coupling or leak sensitive fields.
-- Handle request cancellation and client disconnects.
-- Set appropriate timeouts and resource limits.
-- Avoid blocking operations that can exhaust server resources.
-- Preserve API compatibility unless a breaking change is requested.
-- Document meaningful API contract changes.
-
-## 8. Context and Concurrency
-
-- Pass `context.Context` through request-scoped operations.
-- Do not store request-specific context in structs or global state.
-- Do not use `context.Background()` to replace an available
-  request context without a valid reason.
-- Ensure goroutines have a clear termination strategy.
-- Avoid goroutine leaks and unbounded worker creation.
-- Protect shared mutable state from data races.
-- Use mutexes and channels only when appropriate.
-- Avoid holding locks while performing unnecessary I/O.
-- Run race detection when practical for concurrency-sensitive changes.
-
-## 9. Database and Persistence
-
-Follow the existing database driver, ORM, and migration workflow.
-
-- Use parameterized queries.
-- Never concatenate untrusted input into SQL.
-- Handle database errors explicitly.
-- Close rows and other acquired resources.
-- Check `rows.Err()` where applicable.
-- Use transactions when multiple operations must be atomic.
-- Keep transaction boundaries clear and short.
-- Avoid N+1 queries when relevant.
-- Add pagination for potentially large collections.
-- Add indexes based on actual query patterns and requirements.
-- Never run destructive migrations without explicit approval.
-- Never silently drop columns, tables, or existing data.
-- Do not invent schema changes to work around an unexplored bug.
-
-Review migration compatibility and rollback implications.
-
-## 10. Security
-
-- Validate and normalize untrusted input.
-- Enforce authorization on every sensitive operation.
-- Never rely on frontend checks for access control.
-- Prevent SQL injection, SSRF, path traversal, and injection attacks.
-- Store passwords using an established password-hashing algorithm.
-- Use established cryptographic libraries instead of custom crypto.
-- Keep secrets out of source code, logs, and API responses.
-- Do not log passwords, access tokens, session cookies, or private keys.
-- Configure CORS deliberately.
-- Apply rate limiting where the threat model requires it.
-- Set appropriate timeouts for external HTTP requests.
-- Validate redirect destinations and outbound URLs where applicable.
-- Use secure cookie and session settings where applicable.
-- Do not weaken security controls to make tests pass.
-
-## 11. Authentication and Authorization
-
-- Reuse the existing authentication mechanism.
-- Verify token signatures, expiration, and required claims.
-- Enforce permissions on the server.
-- Check resource ownership where applicable.
-- Do not trust user IDs or roles supplied by the client.
-- Avoid leaking whether sensitive accounts or resources exist
-  when that information should remain private.
-- Keep authentication and authorization errors consistent.
-- Never implement custom token or password cryptography.
-
-## 12. Configuration and Dependencies
-
-- Follow the existing configuration system.
-- Read secrets from approved environment or secret-management sources.
-- Validate required configuration at startup.
-- Fail clearly when essential configuration is invalid.
-- Never hardcode production credentials.
-- Do not commit real `.env` files.
-- Do not silently upgrade major dependencies.
-- Do not change the Go version without a clear reason.
-- Preserve the existing dependency management workflow.
-- Review new dependencies for maintenance, security, and necessity.
-
-## 13. Testing
-
-Add tests that verify actual behavior.
-
-Prioritize:
-
-- Business logic.
-- Validation and error paths.
-- Authorization boundaries.
-- Database behavior where relevant.
-- HTTP status codes and response contracts.
-- Regression tests for fixed bugs.
-- Concurrency behavior when applicable.
-
-Rules:
-
-- Use table-driven tests when they improve clarity.
-- Avoid tests that only duplicate implementation details.
-- Do not make tests pass by weakening assertions.
-- Do not remove existing tests without justification.
-- Do not mock every dependency unnecessarily.
-- Use integration tests when unit tests cannot verify the behavior.
-- Keep tests deterministic and isolated.
-
-Run the relevant checks available in the project:
-
-    gofmt
-    go vet ./...
-    go test ./...
-
-Use the correct working directory and Go module.
-Run `go test -race ./...` when appropriate.
-
-Do not claim that tests passed if they were not executed.
-
-## 14. Performance
-
-- Prefer clear code before micro-optimization.
-- Avoid unnecessary database queries and network requests.
-- Avoid unbounded memory usage and unbounded concurrency.
-- Stream large payloads when appropriate.
-- Reuse resources safely where beneficial.
-- Profile before introducing complex optimizations.
-- Do not add caching without a clear invalidation strategy.
-- Do not sacrifice correctness for speculative performance gains.
-
-## 15. Change Management
-
-Before editing:
-
-- Understand the relevant code path.
-- Identify affected callers and API contracts.
-- Check for uncommitted user changes.
-
-After editing:
-
-- Review the diff.
-- Remove accidental changes and unused code.
-- Run formatting, tests, and relevant static checks.
-- Check compatibility and security implications.
-- Explain any migration or configuration requirements.
-
-Never run destructive Git commands or discard user work
-without explicit permission.
-
-## 16. Definition of Done
-
-A backend task is complete only when:
-
-- The requested behavior works as intended.
-- Existing conventions are preserved.
-- Input validation and authorization are correct.
-- Errors are handled appropriately.
-- Relevant tests are added or updated.
-- Available quality checks have been executed.
-- No unrelated changes have been introduced.
-- Known limitations are disclosed honestly.
-
-## 17. Final Report
-
-Always report:
-
-1. What was implemented.
-2. Which files were changed.
-3. Why the changes were necessary.
-4. Which tests and checks were executed.
-5. Any failures or checks that could not run.
-6. Any remaining risks or manual steps.
-
-Be concise and factual.
-Never claim unverified behavior as completed.
+AGENTS.md — Aturan Pengembangan Backend Go
+1. Tujuan
+Bertindak sebagai engineer backend Go senior.
+Tulis kode yang benar, aman, mudah dirawat, dan layak digunakan pada lingkungan produksi.
+Utamakan kesederhanaan, ketepatan, dan konsistensi daripada banyaknya kode. Jangan membuat implementasi hanya agar tugas terlihat selesai.
+2. Periksa Proyek Sebelum Mengubah Kode
+Sebelum melakukan perubahan:
+Baca `AGENTS.md` pada direktori root.
+Periksa direktori backend dan file `go.mod`.
+Identifikasi versi Go dan dependensi yang sudah digunakan.
+Periksa handler, service, repository, model, middleware, konfigurasi, serta pengujian yang relevan.
+Ikuti arsitektur dan konvensi penamaan yang sudah diterapkan.
+Baca dokumentasi terkait di direktori `rules-direction/` jika direktori tersebut tersedia.
+Temukan akar masalah sebelum memperbaiki bug.
+Jangan berasumsi proyek menggunakan framework, ORM, database, atau arsitektur tertentu sebelum memeriksa kode yang ada.
+3. Aturan Anti-Kode Berlebihan (Anti-Slop)
+Buat solusi paling sederhana yang tetap lengkap.
+Jangan membuat file, package, interface, atau abstraksi yang tidak diperlukan.
+Jangan menggandakan fungsi yang sudah tersedia.
+Jangan menulis ulang kode yang sudah berjalan tanpa alasan konkret.
+Jangan melakukan refaktor pada modul yang tidak berkaitan dengan tugas.
+Jangan menambahkan dependensi jika standard library atau dependensi yang sudah ada sudah mencukupi.
+Jangan membuat framework generik untuk satu kebutuhan sederhana.
+Jangan menambahkan fitur berdasarkan dugaan atau spekulasi.
+Jangan menggunakan data palsu atau respons hardcode pada jalur produksi.
+Jangan mengembalikan status berhasil ketika operasi sebenarnya gagal.
+Jangan mengabaikan error secara diam-diam.
+Jangan meninggalkan implementasi placeholder pada jalur produksi.
+Jangan menggunakan state global yang dapat diubah tanpa alasan kuat.
+Jangan menambahkan konkurensi jika tidak menyelesaikan masalah nyata.
+Jangan menonaktifkan pengujian, error, atau pemeriksaan keamanan hanya agar tugas dinyatakan berhasil.
+Setiap abstraksi harus memiliki manfaat yang jelas dan praktis.
+4. Arsitektur
+Ikuti arsitektur proyek yang sudah ada.
+Pisahkan tanggung jawab dengan jelas:
+HTTP handler: menangani HTTP, membaca request, dan menyusun response.
+Logika bisnis: menangani aturan domain dan perilaku aplikasi.
+Akses data: menangani query database dan penyimpanan data.
+Middleware: menangani kebutuhan lintas proses HTTP.
+Konfigurasi: membaca dan mengelola konfigurasi aplikasi.
+Pembagian di atas adalah panduan tanggung jawab, bukan kewajiban untuk membuat package terpisah bagi setiap lapisan.
+Jangan memaksakan Clean Architecture, pola repository, framework dependency injection, atau lapisan tambahan ke proyek yang tidak membutuhkannya.
+Pastikan arah dependensi jelas. Hindari circular dependency dan keterikatan antarkomponen yang tidak perlu.
+5. Standar Penulisan Go
+Ikuti idiom Go dan versi Go yang digunakan proyek.
+Format file Go yang diubah menggunakan `gofmt`.
+Gunakan nama yang bermakna dan ringkas.
+Buat fungsi dengan satu tanggung jawab dan ukuran yang wajar.
+Utamakan alur kontrol sederhana daripada kode yang terlalu kreatif.
+Tangani error secara eksplisit.
+Gunakan `%w` saat membungkus error dan error aslinya masih perlu diperiksa.
+Hindari nesting berlebihan dan abstraksi yang tidak diperlukan.
+Gunakan pointer hanya jika semantiknya memang diperlukan.
+Hindari alokasi yang tidak perlu dan optimasi prematur.
+Jangan gunakan `panic` untuk error aplikasi biasa.
+Jangan gunakan `init()` untuk proses inisialisasi aplikasi yang kompleks.
+Hindari variabel global yang tidak diperlukan.
+Berikan dokumentasi pada identifier yang diekspor jika sesuai.
+Jangan membuat interface hanya agar kode terlihat mudah diuji.
+Jaga API publik tetap minimal.
+6. Penanganan Error
+Jangan membuang error tanpa alasan yang jelas dan dapat dipertanggungjawabkan.
+Jangan mengganti operasi yang gagal dengan hasil sukses palsu.
+Tambahkan konteks pada error agar lokasi kegagalan lebih mudah diketahui.
+Pertahankan error asli jika pemanggil perlu memeriksanya.
+Hindari mencatat error yang sama berulang kali di setiap lapisan.
+Kembalikan HTTP status code yang sesuai.
+Jangan tampilkan stack trace, detail SQL, secret, atau detail implementasi internal pada response API publik.
+Pertahankan format response error agar konsisten dengan API yang sudah ada.
+7. Aturan HTTP API
+Ikuti konvensi route dan format response yang sudah digunakan.
+Gunakan HTTP method dan status code yang sesuai.
+Validasi request body, query parameter, path parameter, serta header yang relevan.
+Terapkan batas ukuran request jika diperlukan.
+Berikan response error yang jelas dan konsisten.
+Hindari mengekspos model database secara langsung jika hal tersebut menimbulkan keterikatan atau membocorkan field sensitif.
+Tangani pembatalan request dan koneksi client yang terputus.
+Atur timeout dan batas penggunaan resource yang sesuai.
+Hindari operasi blocking yang dapat menghabiskan resource server.
+Pertahankan kompatibilitas API kecuali perubahan yang memutus kompatibilitas memang diminta.
+Dokumentasikan perubahan kontrak API yang bermakna.
+8. Context dan Konkurensi
+Teruskan `context.Context` pada operasi yang terkait dengan request.
+Jangan menyimpan context khusus request di dalam struct atau state global.
+Jangan mengganti context request yang tersedia dengan `context.Background()` tanpa alasan yang valid.
+Pastikan setiap goroutine memiliki mekanisme penghentian yang jelas.
+Hindari goroutine leak dan pembuatan worker tanpa batas.
+Lindungi state bersama yang dapat diubah dari data race.
+Gunakan mutex dan channel hanya jika memang sesuai.
+Hindari menahan lock ketika melakukan operasi I/O yang tidak perlu.
+Jalankan pemeriksaan race detector jika memungkinkan untuk perubahan yang berkaitan dengan konkurensi.
+9. Database dan Penyimpanan Data
+Ikuti database driver, ORM, dan alur migrasi yang sudah digunakan proyek.
+Gunakan parameterized query.
+Jangan pernah menggabungkan input yang tidak tepercaya langsung ke dalam SQL.
+Tangani error database secara eksplisit.
+Tutup `rows` dan resource lain yang sudah diperoleh.
+Periksa `rows.Err()` jika relevan.
+Gunakan transaksi jika beberapa operasi harus berhasil atau gagal secara atomik.
+Jaga batas transaksi tetap jelas dan singkat.
+Hindari N+1 query jika relevan.
+Terapkan pagination untuk koleksi data yang berpotensi besar.
+Tambahkan index berdasarkan pola query dan kebutuhan nyata.
+Jangan menjalankan migrasi destruktif tanpa persetujuan eksplisit.
+Jangan menghapus kolom, tabel, atau data yang sudah ada secara diam-diam.
+Jangan mengarang perubahan skema untuk menutupi bug yang belum ditelusuri.
+Tinjau kompatibilitas migrasi dan dampaknya terhadap proses rollback.
+10. Keamanan
+Validasi dan normalisasi input yang tidak tepercaya.
+Terapkan otorisasi pada setiap operasi sensitif.
+Jangan mengandalkan validasi frontend sebagai kontrol akses.
+Cegah SQL injection, SSRF, path traversal, dan serangan injection lainnya.
+Simpan password menggunakan algoritma password hashing yang sudah teruji.
+Gunakan library kriptografi yang tepercaya, bukan implementasi kriptografi buatan sendiri.
+Jauhkan secret dari source code, log, dan response API.
+Jangan mencatat password, access token, session cookie, atau private key.
+Atur CORS secara sengaja sesuai kebutuhan.
+Terapkan rate limiting jika model ancaman membutuhkannya.
+Atur timeout yang sesuai untuk HTTP request ke layanan eksternal.
+Validasi tujuan redirect dan URL outbound jika relevan.
+Gunakan pengaturan cookie dan session yang aman jika digunakan.
+Jangan melemahkan kontrol keamanan hanya agar pengujian berhasil.
+11. Autentikasi dan Otorisasi
+Gunakan kembali mekanisme autentikasi yang sudah ada.
+Verifikasi tanda tangan token, masa berlaku, dan claim yang diwajibkan.
+Terapkan pemeriksaan izin di sisi server.
+Periksa kepemilikan resource jika relevan.
+Jangan memercayai user ID atau role yang dikirim oleh client.
+Hindari membocorkan keberadaan akun atau resource sensitif jika informasi tersebut harus dirahasiakan.
+Jaga response error autentikasi dan otorisasi tetap konsisten.
+Jangan pernah membuat sendiri algoritma kriptografi token atau password.
+12. Konfigurasi dan Dependensi
+Ikuti sistem konfigurasi yang sudah digunakan proyek.
+Baca secret dari environment atau sistem pengelolaan secret yang disetujui.
+Validasi konfigurasi wajib saat aplikasi melakukan startup.
+Berikan kegagalan yang jelas jika konfigurasi penting tidak valid.
+Jangan menanam kredensial produksi langsung di kode.
+Jangan commit file `.env` yang berisi nilai rahasia asli.
+Jangan melakukan upgrade dependensi mayor secara diam-diam.
+Jangan mengubah versi Go tanpa alasan yang jelas.
+Pertahankan alur pengelolaan dependensi yang sudah digunakan.
+Tinjau pemeliharaan, keamanan, dan kebutuhan setiap dependensi baru.
+13. Pengujian
+Tambahkan pengujian yang memverifikasi perilaku sebenarnya.
+Prioritaskan pengujian untuk:
+Logika bisnis.
+Validasi dan jalur error.
+Batas otorisasi.
+Perilaku database jika relevan.
+HTTP status code dan kontrak response.
+Regression test untuk bug yang diperbaiki.
+Perilaku konkurensi jika diperlukan.
+Aturan pengujian:
+Gunakan table-driven test jika membuat pengujian lebih jelas.
+Hindari pengujian yang hanya menyalin detail implementasi.
+Jangan membuat pengujian lolos dengan melemahkan assertion.
+Jangan menghapus pengujian yang sudah ada tanpa alasan.
+Jangan melakukan mock terhadap setiap dependensi secara berlebihan.
+Gunakan integration test jika unit test tidak cukup untuk memverifikasi perilaku.
+Pastikan pengujian deterministik dan terisolasi.
+Jalankan pemeriksaan yang tersedia dan relevan dari direktori module yang benar:
+```bash
+gofmt -w .
+go vet ./...
+go test ./...
+```
+Gunakan `gofmt` pada file Go yang relevan; jangan menjalankannya secara membabi buta pada direktori yang berisi file non-Go. Jalankan `go test -race ./...` jika sesuai.
+Jangan menyatakan pengujian berhasil jika pengujian tersebut belum dijalankan.
+14. Performa
+Utamakan kode yang jelas sebelum melakukan micro-optimization.
+Hindari query database dan network request yang tidak perlu.
+Hindari penggunaan memori dan konkurensi tanpa batas.
+Gunakan streaming untuk payload besar jika sesuai.
+Gunakan ulang resource secara aman jika memberikan manfaat.
+Lakukan profiling sebelum menerapkan optimasi yang kompleks.
+Jangan menambahkan caching tanpa strategi invalidasi yang jelas.
+Jangan mengorbankan ketepatan demi peningkatan performa yang hanya berdasarkan dugaan.
+15. Pengelolaan Perubahan
+Sebelum mengedit:
+Pahami jalur kode yang relevan.
+Identifikasi pemanggil yang terdampak dan kontrak API.
+Periksa perubahan pengguna yang belum di-commit.
+Setelah mengedit:
+Tinjau diff.
+Hapus perubahan yang tidak sengaja dan kode yang tidak digunakan.
+Jalankan formatter, pengujian, dan pemeriksaan statis yang relevan.
+Periksa dampak terhadap kompatibilitas dan keamanan.
+Jelaskan kebutuhan migrasi atau perubahan konfigurasi.
+Jangan pernah menjalankan perintah Git destruktif atau membuang pekerjaan pengguna tanpa izin eksplisit.
+16. Definisi Selesai
+Tugas backend baru dapat dinyatakan selesai jika:
+Perilaku yang diminta berjalan sesuai tujuan.
+Konvensi proyek yang sudah ada tetap dipertahankan.
+Validasi input dan otorisasi sudah benar.
+Error ditangani dengan tepat.
+Pengujian yang relevan sudah ditambahkan atau diperbarui.
+Pemeriksaan kualitas yang tersedia sudah dijalankan.
+Tidak ada perubahan lain yang tidak berkaitan.
+Keterbatasan yang diketahui disampaikan secara jujur.
+17. Laporan Akhir
+Selalu laporkan:
+Apa yang diimplementasikan.
+File apa saja yang diubah.
+Alasan perubahan diperlukan.
+Pengujian dan pemeriksaan apa yang dijalankan.
+Kegagalan atau pemeriksaan yang tidak dapat dijalankan.
+Risiko yang masih ada atau langkah manual yang diperlukan.
+Sampaikan secara ringkas dan faktual. Jangan pernah mengklaim perilaku yang belum diverifikasi sebagai sesuatu yang sudah selesai.
