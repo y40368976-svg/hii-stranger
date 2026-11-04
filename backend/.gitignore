@@ -1,6 +1,6 @@
-# Rahasia lokal, jangan di-commit.
+# Rahasia lokal, jangan di-commit (contoh nilai ada di .env.example).
 .env
 
-# Gambar unggahan (produk, banner, bukti bayar), jangan di-commit. TODO.md tetap ikut.
-uploads/*
-!uploads/TODO.md
+# Hasil build
+*.exe
+/bin/
