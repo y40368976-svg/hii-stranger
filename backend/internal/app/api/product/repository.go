@@ -31,7 +31,7 @@ const (
 	// pageColumns adalah kolom yang sama setelah dibungkus subquery p dan
 	// di-cast seperti productColumns.
 	rawColumns = `id, category_id, name, description, price, discount_percent,
-		weight_gram, availability_type, po_estimate_days, status`
+		weight_gram, availability_type, po_estimate_days, status, created_at`
 	pageColumns = `p.id, p.category_id, p.name, p.description, p.price::text, p.discount_percent::float8,
 		p.weight_gram, p.availability_type, p.po_estimate_days, p.status`
 )
@@ -43,7 +43,13 @@ var orderBy = map[string]string{
 	"-name":  "name DESC, id",
 	"price":  "price, id",
 	"-price": "price DESC, id",
+	// newest: produk terbaru dulu (beranda "Baru Datang").
+	"newest": "created_at DESC, id",
 }
+
+// stockColumns menghitung total stok & jumlah varian per produk di daftar.
+const stockColumns = `(SELECT COALESCE(SUM(v.stock), 0)::int FROM product_variants v WHERE v.product_id = p.id),
+		(SELECT COUNT(*)::int FROM product_variants v WHERE v.product_id = p.id)`
 
 // Repository mengakses tabel products.
 type Repository struct {
@@ -98,10 +104,10 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]P
 	// dicari untuk baris di halaman itu saja. Dulu gambar dicari untuk semua
 	// baris sebelum OFFSET, sehingga halaman belakang makin lambat.
 	pageArgs := append(append([]any{}, args...), limit, offset)
-	query := fmt.Sprintf(`SELECT %s, %s
+	query := fmt.Sprintf(`SELECT %s, %s, %s
 		  FROM (SELECT %s FROM products%s ORDER BY %s LIMIT $%d OFFSET $%d) p
 		 ORDER BY %s`,
-		pageColumns, primaryImage, rawColumns, where, order, len(pageArgs)-1, len(pageArgs), qualify(order, "p."))
+		pageColumns, primaryImage, stockColumns, rawColumns, where, order, len(pageArgs)-1, len(pageArgs), qualify(order, "p."))
 
 	b := &pgx.Batch{}
 	b.Queue("SELECT COUNT(*) FROM products"+where, args...)
@@ -279,7 +285,7 @@ func scanListProduct(row pgx.Row) (Product, error) {
 	var p Product
 	err := row.Scan(&p.ID, &p.CategoryID, &p.Name, &p.Description, &p.Price,
 		&p.DiscountPercent, &p.WeightGram, &p.AvailabilityType, &p.PoEstimateDays, &p.Status,
-		&p.PrimaryImageURL)
+		&p.PrimaryImageURL, &p.TotalStock, &p.VariantCount)
 	return p, err
 }
 

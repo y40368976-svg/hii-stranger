@@ -1,8 +1,8 @@
-// Package order mengelola checkout dari keranjang dan daftar/detail order.
 package order
 
 import (
 	"errors"
+	"time"
 
 	"hii-stranger1/backend/internal/app/api/ongkir"
 	"hii-stranger1/backend/internal/app/api/payment"
@@ -10,33 +10,34 @@ import (
 )
 
 var (
-	// ErrNotFound berarti order tidak ada atau bukan milik pemanggil.
+	// ErrNotFound: order tidak ada atau bukan milik user.
 	ErrNotFound = errors.New("order: not found")
-	// ErrCartEmpty berarti tidak ada item keranjang yang bisa di-checkout.
+	// ErrCartEmpty: keranjang kosong saat checkout.
 	ErrCartEmpty = errors.New("order: cart is empty")
-	// ErrCartItemNotFound berarti ada cart_item_ids yang bukan milik user.
+	// ErrCartItemNotFound: ada cart_item_ids yang bukan milik user.
 	ErrCartItemNotFound = errors.New("order: cart item not found")
-	// ErrProductUnavailable berarti ada produk di keranjang yang sudah tidak tayang.
+	// ErrProductUnavailable: produk di keranjang sudah nonaktif.
 	ErrProductUnavailable = errors.New("order: product unavailable")
-	// ErrInsufficientStock berarti stok varian tidak cukup saat checkout.
+	// ErrInsufficientStock: stok varian tidak cukup.
 	ErrInsufficientStock = errors.New("order: insufficient stock")
-	// ErrCartChanged berarti isi keranjang berubah di tengah checkout sehingga
-	// ongkir yang dihitung tidak lagi sesuai berat paket.
+	// ErrCartChanged: berat keranjang berubah antara cek ongkir dan checkout.
 	ErrCartChanged = errors.New("order: cart changed during checkout")
-	// ErrTrackingRequired berarti status shipped dikirim tanpa no. resi.
+	// ErrTrackingRequired: status shipped wajib disertai no. resi.
 	ErrTrackingRequired = errors.New("order: tracking number required")
-	// ErrInvalidTransition berarti perubahan status order tidak diizinkan.
+	// ErrInvalidTransition: perubahan status tidak diizinkan.
 	ErrInvalidTransition = errors.New("order: invalid status transition")
-	// errDuplicateNumber berarti nomor order bentrok (sangat jarang); dicoba ulang.
+	// ErrEmailNotVerified: pelanggan belum memverifikasi email.
+	ErrEmailNotVerified = errors.New("order: email not verified")
+	// ErrNotCustomer: hanya akun pelanggan yang boleh memesan.
+	ErrNotCustomer = errors.New("order: only customers can place orders")
+	// ErrProofUnderReview: order tidak bisa dibatalkan pelanggan karena
+	// bukti bayar sedang diverifikasi admin.
+	ErrProofUnderReview = errors.New("order: payment proof under review")
+
 	errDuplicateNumber = errors.New("order: duplicate order number")
 )
 
-// Status order. Alur normal:
-//
-//	pending_payment -> paid (otomatis saat pembayaran disetujui admin)
-//	paid -> processing -> shipped -> completed
-//
-// Order dapat dibatalkan (cancelled) selama belum dikirim; stok dikembalikan.
+// Status order.
 const (
 	StatusPendingPayment = "pending_payment"
 	StatusPaid           = "paid"
@@ -46,9 +47,8 @@ const (
 	StatusCancelled      = "cancelled"
 )
 
-// transitions adalah perubahan status yang boleh dilakukan admin lewat
-// PUT /admin/orders/{orderId}/status. pending_payment -> paid sengaja tidak
-// ada karena terjadi lewat verifikasi pembayaran.
+// transitions adalah perubahan status yang boleh dilakukan admin.
+// pending_payment -> paid terjadi otomatis saat pembayaran disetujui.
 var transitions = map[string][]string{
 	StatusPendingPayment: {StatusCancelled},
 	StatusPaid:           {StatusProcessing, StatusCancelled},
@@ -56,8 +56,10 @@ var transitions = map[string][]string{
 	StatusShipped:        {StatusCompleted},
 }
 
-// Order adalah satu baris tabel orders (schema Order). Nilai uang berupa
-// string desimal.
+// defaultPaymentWindow dipakai bila site_settings belum diisi.
+const defaultPaymentWindow = 24
+
+// Order adalah satu pesanan.
 type Order struct {
 	ID                string  `json:"id"`
 	OrderNumber       string  `json:"order_number"`
@@ -72,7 +74,6 @@ type Order struct {
 	TotalAmount       string  `json:"total_amount"`
 	OrderStatus       string  `json:"order_status"`
 
-	// Detail tujuan & kurir dari RajaOngkir. Nullable untuk order lama.
 	ShippingProvince      *string `json:"shipping_province"`
 	ShippingDistrict      *string `json:"shipping_district"`
 	ShippingSubdistrictID *int    `json:"shipping_subdistrict_id"`
@@ -81,23 +82,38 @@ type Order struct {
 	CourierService        *string `json:"courier_service"`
 	ShippingETD           *string `json:"shipping_etd"`
 	ShippingWeightGram    *int    `json:"shipping_weight_gram"`
+
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	PaymentDueAt *time.Time `json:"payment_due_at"`
+	CancelReason *string    `json:"cancel_reason"`
 }
 
-// Item adalah snapshot satu item saat checkout (schema OrderItem).
+// ListItem adalah order di daftar, dengan ringkasan item & pembayaran supaya
+// daftar tidak perlu memanggil detail satu per satu.
+type ListItem struct {
+	Order
+	ItemCount     int     `json:"item_count"`
+	PaymentStatus *string `json:"payment_status"`
+	HasProof      bool    `json:"has_proof"`
+	CustomerEmail string  `json:"customer_email"`
+}
+
+// Item adalah baris order_items.
 type Item struct {
-	ID          string `json:"id"`
-	OrderID     string `json:"order_id"`
-	ProductID   string `json:"product_id"`
-	VariantID   string `json:"variant_id"`
-	ProductName string `json:"product_name"`
-	Size        string `json:"size"`
-	UnitPrice   string `json:"unit_price"`
-	Quantity    int    `json:"quantity"`
-	Subtotal    string `json:"subtotal"`
+	ID          string  `json:"id"`
+	OrderID     string  `json:"order_id"`
+	ProductID   string  `json:"product_id"`
+	VariantID   string  `json:"variant_id"`
+	ProductName string  `json:"product_name"`
+	Size        string  `json:"size"`
+	UnitPrice   string  `json:"unit_price"`
+	Quantity    int     `json:"quantity"`
+	Subtotal    string  `json:"subtotal"`
+	ImageURL    *string `json:"image_url"`
 }
 
-// Detail adalah order beserta item, pembayaran, dan pengirimannya (schema
-// OrderDetail). Payment/Shipment bernilai null bila belum ada.
+// Detail adalah order lengkap untuk halaman detail.
 type Detail struct {
 	Order
 	Items    []Item             `json:"items"`
@@ -105,16 +121,15 @@ type Detail struct {
 	Shipment *shipment.Shipment `json:"shipment"`
 }
 
-// Filter adalah syarat pencarian daftar order. Field kosong berarti tidak dipakai.
+// Filter untuk daftar order.
 type Filter struct {
-	UserID      string
-	Status      string
-	OrderNumber string
+	UserID string
+	Status string
+	// Q mencari no. order atau nama penerima (admin).
+	Q string
 }
 
-// CheckoutInput adalah data checkout yang sudah divalidasi handler.
-// Destination berisi ID wilayah dari endpoint /regions; namanya diambil
-// server dari RajaOngkir supaya alamat konsisten.
+// CheckoutInput adalah data checkout yang sudah divalidasi.
 type CheckoutInput struct {
 	RecipientName   string
 	RecipientPhone  string
@@ -123,14 +138,12 @@ type CheckoutInput struct {
 	CartItemIDs     []string
 }
 
-// shipping adalah hasil hitung ongkir yang dipakai saat menyimpan order.
 type shipping struct {
 	Address    ongkir.Address
 	Option     ongkir.Option
 	WeightGram int
 }
 
-// createRequest adalah body POST /orders.
 type createRequest struct {
 	RecipientName   string   `json:"recipient_name"`
 	RecipientPhone  string   `json:"recipient_phone"`
@@ -142,22 +155,46 @@ type createRequest struct {
 	CartItemIDs     []string `json:"cart_item_ids"`
 }
 
-// statusRequest adalah body PUT /admin/orders/{orderId}/status.
-// TrackingNumber wajib (dan CourierName opsional) saat status menjadi shipped.
 type statusRequest struct {
 	OrderStatus    string  `json:"order_status"`
 	TrackingNumber *string `json:"tracking_number"`
 	CourierName    *string `json:"courier_name"`
+	Reason         *string `json:"reason"`
 }
 
-// ShipInfo adalah data resi yang diisi admin saat order dikirim.
+type cancelRequest struct {
+	Reason *string `json:"reason"`
+}
+
+// ShipInfo adalah data resi saat order ditandai dikirim.
 type ShipInfo struct {
 	TrackingNumber string
 	CourierName    string // kosong berarti memakai kurir dari checkout
 }
 
-// contact berisi data untuk email notifikasi.
 type contact struct {
 	Email string
 	Name  string
+}
+
+// Summary adalah ringkasan operasional untuk dashboard admin.
+type Summary struct {
+	StatusCounts    map[string]int `json:"status_counts"`
+	ProofsToReview  int            `json:"proofs_to_review"`
+	OrdersToday     int            `json:"orders_today"`
+	RevenueMonth    string         `json:"revenue_month"`
+	PaidOrdersMonth int            `json:"paid_orders_month"`
+	LowStock        []LowStock     `json:"low_stock"`
+	Recent          []ListItem     `json:"recent"`
+}
+
+// LowStock adalah varian aktif yang stoknya menipis.
+type LowStock struct {
+	ProductID   string  `json:"product_id"`
+	ProductName string  `json:"product_name"`
+	VariantID   string  `json:"variant_id"`
+	SKU         string  `json:"sku"`
+	Size        string  `json:"size"`
+	Color       *string `json:"color"`
+	Stock       int     `json:"stock"`
 }

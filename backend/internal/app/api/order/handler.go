@@ -50,7 +50,14 @@ func (h *Handler) AdminList(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	f.UserID = q.Get("user_id")
-	f.OrderNumber = strings.TrimSpace(q.Get("order_number"))
+	f.Q = strings.TrimSpace(q.Get("q"))
+	if f.Q == "" {
+		f.Q = strings.TrimSpace(q.Get("order_number"))
+	}
+	if len([]rune(f.Q)) > 100 {
+		response.Error(w, http.StatusBadRequest, "bad_request", "Parameter q maksimal 100 karakter.")
+		return
+	}
 	if f.UserID != "" && !validator.UUID(f.UserID) {
 		response.Error(w, http.StatusBadRequest, "bad_request", "Parameter user_id tidak valid.")
 		return
@@ -136,6 +143,13 @@ func (h *Handler) AdminUpdateStatus(w http.ResponseWriter, r *http.Request) {
 
 	var c validator.Collector
 	c.Check(validStatus(req.OrderStatus), "order_status", "order_status tidak dikenal.")
+	var reason *string
+	if req.Reason != nil {
+		if v := strings.TrimSpace(*req.Reason); v != "" {
+			reason = &v
+		}
+	}
+	c.Check(reason == nil || validator.RuneLenBetween(*reason, 1, 300), "reason", "Alasan maksimal 300 karakter.")
 	var ship *ShipInfo
 	if req.OrderStatus == StatusShipped {
 		info := ShipInfo{}
@@ -156,7 +170,7 @@ func (h *Handler) AdminUpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	o, err := h.svc.UpdateStatus(r.Context(), id, req.OrderStatus, ship)
+	o, err := h.svc.UpdateStatus(r.Context(), id, req.OrderStatus, ship, reason)
 	if h.writeError(w, r, "update status", err) {
 		return
 	}
@@ -165,6 +179,71 @@ func (h *Handler) AdminUpdateStatus(w http.ResponseWriter, r *http.Request) {
 
 // writeError menerjemahkan error service menjadi response. Mengembalikan true
 // bila err tidak nil (response sudah ditulis).
+// Cancel melayani POST /orders/{orderId}/cancel: pelanggan membatalkan
+// ordernya sendiri selama masih menunggu pembayaran.
+func (h *Handler) Cancel(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("orderId")
+	if !validator.UUID(id) {
+		notFound(w)
+		return
+	}
+	uid, _ := principal(r)
+	if uid == "" {
+		unauthorized(w)
+		return
+	}
+	var req cancelRequest
+	if r.ContentLength != 0 && !response.Decode(w, r, &req) {
+		return
+	}
+	var reason *string
+	if req.Reason != nil {
+		if v := strings.TrimSpace(*req.Reason); v != "" {
+			if !validator.RuneLenBetween(v, 1, 300) {
+				validationFailed(w, response.FieldError{Field: "reason", Message: "Alasan maksimal 300 karakter."})
+				return
+			}
+			reason = &v
+		}
+	}
+	o, err := h.svc.Cancel(r.Context(), id, uid, reason)
+	if h.writeError(w, r, "cancel", err) {
+		return
+	}
+	response.JSON(w, http.StatusOK, o)
+}
+
+// Complete melayani POST /orders/{orderId}/complete: pelanggan konfirmasi
+// paket sudah diterima.
+func (h *Handler) Complete(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("orderId")
+	if !validator.UUID(id) {
+		notFound(w)
+		return
+	}
+	uid, _ := principal(r)
+	if uid == "" {
+		unauthorized(w)
+		return
+	}
+	o, err := h.svc.Complete(r.Context(), id, uid)
+	if h.writeError(w, r, "complete", err) {
+		return
+	}
+	response.JSON(w, http.StatusOK, o)
+}
+
+// AdminSummary melayani GET /admin/summary (dashboard admin).
+func (h *Handler) AdminSummary(w http.ResponseWriter, r *http.Request) {
+	s, err := h.svc.Summary(r.Context())
+	if err != nil {
+		slog.ErrorContext(r.Context(), "order summary failed", "error", err)
+		response.Internal(w)
+		return
+	}
+	response.JSON(w, http.StatusOK, s)
+}
+
 func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, op string, err error) bool {
 	switch {
 	case err == nil:
@@ -188,6 +267,13 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, op string, 
 		validationFailed(w, response.FieldError{Field: "tracking_number", Message: "No. resi wajib diisi."})
 	case errors.Is(err, ErrInvalidTransition):
 		conflict(w, "Perubahan status order tidak diizinkan.")
+	case errors.Is(err, ErrEmailNotVerified):
+		response.Error(w, http.StatusForbidden, "email_not_verified",
+			"Verifikasi email kamu terlebih dahulu sebelum membuat pesanan.")
+	case errors.Is(err, ErrNotCustomer):
+		response.Error(w, http.StatusForbidden, "forbidden", "Hanya akun pelanggan yang dapat membuat pesanan.")
+	case errors.Is(err, ErrProofUnderReview):
+		conflict(w, "Bukti pembayaran sedang diverifikasi admin, pesanan tidak dapat dibatalkan.")
 	default:
 		slog.ErrorContext(r.Context(), op+" order failed", "error", err)
 		response.Internal(w)

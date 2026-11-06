@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strings"
 
 	"hii-stranger1/backend/internal/pkg/response"
@@ -78,7 +79,7 @@ func withPrincipal(tokens *token.Manager, r *http.Request) (*http.Request, bool)
 // RequireRole menolak pemanggil yang rolenya bukan role dengan 403. Wajib
 // dipasang setelah Authenticate; tanpa Principal di context dijawab 401. Role
 // dibaca dari token, jadi perubahan role baru berlaku pada token berikutnya.
-func RequireRole(role string) Middleware {
+func RequireRole(roles ...string) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			p, ok := PrincipalFrom(r.Context())
@@ -86,7 +87,7 @@ func RequireRole(role string) Middleware {
 				unauthorized(w)
 				return
 			}
-			if p.Role != role {
+			if !slices.Contains(roles, p.Role) {
 				response.Error(w, http.StatusForbidden, "forbidden", "Anda tidak memiliki akses.")
 				return
 			}

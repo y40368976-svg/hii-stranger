@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"hii-stranger1/backend/internal/app/api/middleware"
 	"hii-stranger1/backend/internal/app/api/user"
 	"hii-stranger1/backend/internal/pkg/response"
 	"hii-stranger1/backend/internal/pkg/validator"
@@ -119,4 +120,55 @@ func validateLogin(req loginRequest) []response.FieldError {
 	c.Check(validator.Email(req.Email), "email", "Format email tidak valid.")
 	c.Check(req.Password != "", "password", "Password wajib diisi.")
 	return c.Errors()
+}
+
+type verifyRequest struct {
+	Token string `json:"token"`
+}
+
+// VerifyEmail melayani POST /auth/verify-email (publik). Body {"token": "..."}
+// dari tautan email; response berisi profil user yang sudah terverifikasi.
+func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	var req verifyRequest
+	if !response.Decode(w, r, &req) {
+		return
+	}
+	req.Token = strings.TrimSpace(req.Token)
+	if !validator.ByteLenBetween(req.Token, 20, 200) {
+		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.",
+			response.FieldError{Field: "token", Message: "Token verifikasi tidak valid."})
+		return
+	}
+	u, err := h.svc.VerifyEmail(r.Context(), req.Token)
+	switch {
+	case errors.Is(err, user.ErrInvalidVerification):
+		response.Error(w, http.StatusGone, "verification_invalid",
+			"Tautan verifikasi tidak valid atau sudah kedaluwarsa. Minta kirim ulang dari halaman akun.")
+	case err != nil:
+		slog.ErrorContext(r.Context(), "verify email failed", "error", err)
+		response.Internal(w)
+	default:
+		response.JSON(w, http.StatusOK, u.Response())
+	}
+}
+
+// ResendVerification melayani POST /auth/verification/resend (login).
+func (h *Handler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	p, ok := middleware.PrincipalFrom(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "unauthorized", "Autentikasi diperlukan.")
+		return
+	}
+	err := h.svc.ResendVerification(r.Context(), p.UserID)
+	switch {
+	case errors.Is(err, ErrAlreadyVerified):
+		response.Error(w, http.StatusConflict, "conflict", "Email sudah terverifikasi.")
+	case errors.Is(err, user.ErrNotFound):
+		response.Error(w, http.StatusNotFound, "not_found", "Data tidak ditemukan.")
+	case err != nil:
+		slog.ErrorContext(r.Context(), "resend verification failed", "error", err)
+		response.Internal(w)
+	default:
+		response.NoContent(w)
+	}
 }

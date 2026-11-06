@@ -92,7 +92,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	items := make([]ListItem, 0, len(products))
 	for _, p := range products {
-		items = append(items, ListItem{Response: p.Response(), PrimaryImageURL: p.PrimaryImageURL})
+		items = append(items, ListItem{Response: p.Response(), PrimaryImageURL: p.PrimaryImageURL,
+			TotalStock: p.TotalStock, VariantCount: p.VariantCount})
 	}
 	response.List(w, http.StatusOK, items, response.Meta{Page: page, Limit: limit, Total: total})
 }

@@ -13,7 +13,7 @@ import (
 const (
 	foreignKeyViolation = "23503"
 
-	shipmentColumns = `id, order_id, courier_name, tracking_number, coverage_status, shipping_status`
+	shipmentColumns = `id, order_id, courier_name, tracking_number, coverage_status, shipping_status, updated_at`
 )
 
 // Repository mengakses tabel shipments.
@@ -84,11 +84,12 @@ func upsert(ctx context.Context, q queryRower, s Shipment) (Shipment, bool, erro
 		    SET courier_name = EXCLUDED.courier_name,
 		        tracking_number = EXCLUDED.tracking_number,
 		        coverage_status = EXCLUDED.coverage_status,
-		        shipping_status = EXCLUDED.shipping_status
+		        shipping_status = EXCLUDED.shipping_status,
+		        updated_at = now()
 		 RETURNING `+shipmentColumns+`, (xmax = 0)`,
 		s.OrderID, s.CourierName, s.TrackingNumber, s.CoverageStatus, s.ShippingStatus,
 	).Scan(&out.ID, &out.OrderID, &out.CourierName, &out.TrackingNumber,
-		&out.CoverageStatus, &out.ShippingStatus, &created)
+		&out.CoverageStatus, &out.ShippingStatus, &out.UpdatedAt, &created)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation {
@@ -114,7 +115,7 @@ func (r *Repository) contactOf(ctx context.Context, orderID string) (contact, er
 
 func scanShipment(row pgx.Row) (Shipment, error) {
 	var s Shipment
-	err := row.Scan(&s.ID, &s.OrderID, &s.CourierName, &s.TrackingNumber, &s.CoverageStatus, &s.ShippingStatus)
+	err := row.Scan(&s.ID, &s.OrderID, &s.CourierName, &s.TrackingNumber, &s.CoverageStatus, &s.ShippingStatus, &s.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Shipment{}, ErrNotFound
 	}

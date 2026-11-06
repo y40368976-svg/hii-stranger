@@ -112,11 +112,16 @@ func (r *Repository) AddItem(
 	// Kunci baris varian supaya dua request bersamaan tidak membuat item ganda
 	// atau sama-sama lolos cek stok.
 	var stock int
+	var productStatus string
 	err = tx.QueryRow(ctx,
-		`SELECT stock FROM product_variants WHERE id = $1 FOR NO KEY UPDATE`,
+		`SELECT v.stock, p.status
+		   FROM product_variants v JOIN products p ON p.id = v.product_id
+		  WHERE v.id = $1
+		    FOR NO KEY UPDATE OF v`,
 		variantID,
-	).Scan(&stock)
-	if errors.Is(err, pgx.ErrNoRows) {
+	).Scan(&stock, &productStatus)
+	// Produk nonaktif diperlakukan seperti varian yang tidak ada.
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && productStatus != "active") {
 		return "", ErrVariantNotFound
 	}
 	if err != nil {

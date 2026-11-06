@@ -38,6 +38,9 @@ const (
 const (
 	MethodBankTransfer = "bank_transfer"
 	MethodEWallet      = "ewallet"
+	// MethodQRIS adalah satu-satunya metode untuk order baru: QRIS statis toko,
+	// nominal unik (total + kode unik) diverifikasi admin dari bukti bayar.
+	MethodQRIS = "qris"
 )
 
 // Status order yang dibaca/diubah oleh package ini. Nilainya HARUS sama
@@ -62,9 +65,21 @@ type Payment struct {
 	PaidAt     *time.Time `json:"paid_at"`
 	ReviewedBy *string    `json:"reviewed_by"`
 	ReviewedAt *time.Time `json:"reviewed_at"`
+	CreatedAt  time.Time  `json:"created_at"`
 }
 
 // Proof adalah isi berkas bukti pembayaran beserta tipe MIME-nya.
+// AdminItem adalah pembayaran di antrean admin beserta ringkasan ordernya.
+type AdminItem struct {
+	Payment
+	OrderNumber   string     `json:"order_number"`
+	OrderStatus   string     `json:"order_status"`
+	OrderTotal    string     `json:"order_total"`
+	PaymentDueAt  *time.Time `json:"payment_due_at"`
+	CustomerName  string     `json:"customer_name"`
+	CustomerEmail string     `json:"customer_email"`
+}
+
 type Proof struct {
 	Data []byte
 	Type string

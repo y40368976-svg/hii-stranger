@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -17,30 +18,40 @@ import (
 const (
 	uniqueViolation = "23505"
 
-	orderColumns = `id, order_number, user_id, recipient_name, recipient_phone, shipping_address,
-		shipping_city, shipping_kelurahan, subtotal::text, shipping_cost::text, total_amount::text, order_status,
-		shipping_province, shipping_district, shipping_subdistrict_id, shipping_zip_code,
-		courier_code, courier_service, shipping_etd, shipping_weight_gram`
+	itemColumns = `oi.id, oi.order_id, oi.product_id, oi.variant_id, oi.product_name, oi.size,
+		oi.unit_price::text, oi.quantity, oi.subtotal::text,
+		(SELECT pi.image_url FROM product_images pi WHERE pi.product_id = oi.product_id
+		  ORDER BY pi.is_primary DESC, pi.sort_order, pi.id LIMIT 1)`
+	itemsQuery = "SELECT " + itemColumns + " FROM order_items oi WHERE oi.order_id = $1 ORDER BY oi.product_name, oi.size, oi.id"
 
-	itemColumns = `id, order_id, product_id, variant_id, product_name, size, unit_price::text, quantity, subtotal::text`
-
-	itemsQuery = "SELECT " + itemColumns + " FROM order_items WHERE order_id = $1 ORDER BY product_name, size, id"
-
-	// unitPrice adalah harga satuan setelah diskon (sama dengan rumus di cart).
+	// unitPrice adalah harga setelah diskon, dibulatkan 2 desimal (sama dengan keranjang).
 	unitPrice = `ROUND(p.price * (100 - p.discount_percent) / 100, 2)`
+
+	lowStockThreshold = 3
 )
+
+// orderFields adalah kolom order dengan urutan yang sama dengan scanOrder.
+var orderFields = []string{
+	"id", "order_number", "user_id", "recipient_name", "recipient_phone", "shipping_address",
+	"shipping_city", "shipping_kelurahan", "subtotal::text", "shipping_cost::text", "total_amount::text", "order_status",
+	"shipping_province", "shipping_district", "shipping_subdistrict_id", "shipping_zip_code",
+	"courier_code", "courier_service", "shipping_etd", "shipping_weight_gram",
+	"created_at", "updated_at", "payment_due_at", "cancel_reason",
+}
+
+// orderColumns dipakai pada query/RETURNING dengan alias tabel o.
+var orderColumns = "o." + strings.Join(orderFields, ", o.")
 
 // Repository mengakses tabel orders dan order_items.
 type Repository struct {
 	db *pgxpool.Pool
 }
 
-// NewRepository membuat Repository di atas pool koneksi.
+// NewRepository membuat Repository.
 func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
-// cartLine adalah satu item keranjang yang dibaca saat checkout.
 type cartLine struct {
 	CartItemID    string
 	VariantID     string
@@ -55,16 +66,20 @@ type cartLine struct {
 	WeightGram    int // berat produk x jumlah
 }
 
-// Checkout membuat order dari keranjang dalam SATU transaksi: kunci item &
-// varian, cek stok, simpan order + item (snapshot), kurangi stok, lalu hapus
-// item keranjang yang dipakai. Bila satu langkah gagal, semuanya dibatalkan.
-// ship berisi ongkir yang sudah dihitung service untuk berat ship.WeightGram.
-func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, ship shipping, in CheckoutInput) (Order, error) {
+// Checkout membuat order + item + tagihan QRIS, mengurangi stok, dan
+// menghapus item keranjang dalam satu transaksi. Hanya pelanggan aktif yang
+// emailnya sudah terverifikasi yang boleh checkout (dicek di sini supaya
+// tidak bergantung pada isi token).
+func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, uniqueCode int, ship shipping, in CheckoutInput) (Order, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return Order{}, wrap("checkout begin", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := checkCustomer(ctx, tx, userID); err != nil {
+		return Order{}, err
+	}
 
 	lines, err := lockCartLines(ctx, tx, userID, in.CartItemIDs)
 	if err != nil {
@@ -77,8 +92,6 @@ func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, s
 		return Order{}, ErrCartItemNotFound
 	}
 
-	// Hitung kebutuhan stok per varian (satu varian bisa muncul lebih dari
-	// sekali di keranjang) sekaligus subtotal order.
 	need := map[string]int{}
 	subtotal := new(big.Rat)
 	cartIDs := make([]string, 0, len(lines))
@@ -99,9 +112,6 @@ func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, s
 		subtotal.Add(subtotal, sub)
 		cartIDs = append(cartIDs, l.CartItemID)
 	}
-
-	// Ongkir dihitung dari berat sebelum transaksi; bila keranjang berubah di
-	// sela waktu itu, tolak supaya pelanggan cek ongkir ulang.
 	if weight != ship.WeightGram {
 		return Order{}, ErrCartChanged
 	}
@@ -113,22 +123,28 @@ func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, s
 	}
 	total := new(big.Rat).Add(subtotal, shippingCost)
 
+	window := defaultPaymentWindow
+	err = tx.QueryRow(ctx, `SELECT payment_window_hours FROM site_settings WHERE id = 1`).Scan(&window)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return Order{}, wrap("checkout payment window", err)
+	}
+
 	a := ship.Address
 	o, err := scanOrder(tx.QueryRow(ctx,
-		`INSERT INTO orders
+		`INSERT INTO orders AS o
 		   (order_number, user_id, recipient_name, recipient_phone, shipping_address,
 		    shipping_province, shipping_city, shipping_district, shipping_kelurahan,
 		    shipping_subdistrict_id, shipping_zip_code,
 		    courier_code, courier_service, shipping_etd, shipping_weight_gram,
-		    subtotal, shipping_cost, total_amount, order_status)
+		    subtotal, shipping_cost, total_amount, order_status, payment_due_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-		         $16::numeric, $17::numeric, $18::numeric, $19)
+		         $16::numeric, $17::numeric, $18::numeric, $19, now() + make_interval(hours => $20))
 		 RETURNING `+orderColumns,
 		orderNumber, userID, in.RecipientName, in.RecipientPhone, in.ShippingAddress,
 		a.Province, a.City, a.District, a.Subdistrict,
 		a.SubdistrictID, nullIfEmpty(a.ZipCode),
 		ship.Option.CourierCode, ship.Option.Service, nullIfEmpty(ship.Option.ETD), ship.WeightGram,
-		subtotal.FloatString(2), cost, total.FloatString(2), StatusPendingPayment))
+		subtotal.FloatString(2), cost, total.FloatString(2), StatusPendingPayment, window))
 	if err != nil {
 		return Order{}, wrap("checkout insert order", err)
 	}
@@ -144,27 +160,63 @@ func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, s
 		}
 	}
 
+	// Tagihan QRIS langsung dibuat: nominal = total + kode unik 3 digit
+	// supaya admin bisa mencocokkan mutasi QRIS dengan order.
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO payments (order_id, method, amount, unique_code, status)
+		 VALUES ($1, 'qris', $2::numeric + $3::int, $3::int, 'pending')`,
+		o.ID, o.TotalAmount, uniqueCode); err != nil {
+		return Order{}, wrap("checkout insert payment", err)
+	}
+
 	for variantID, qty := range need {
 		if _, err := tx.Exec(ctx,
 			`UPDATE product_variants SET stock = stock - $2 WHERE id = $1`, variantID, qty); err != nil {
 			return Order{}, wrap("checkout reduce stock", err)
 		}
 	}
-
 	if _, err := tx.Exec(ctx,
 		`DELETE FROM cart_items WHERE id = ANY($1::uuid[])`, cartIDs); err != nil {
 		return Order{}, wrap("checkout clear cart", err)
 	}
-
 	if err := tx.Commit(ctx); err != nil {
 		return Order{}, wrap("checkout commit", err)
 	}
 	return o, nil
 }
 
-// lockCartLines membaca item keranjang user (semua, atau hanya ids bila
-// diisi) dan mengunci baris item serta variannya sampai transaksi selesai,
-// supaya stok tidak diambil checkout lain secara bersamaan.
+// CanOrder memastikan user adalah pelanggan aktif dengan email terverifikasi.
+func (r *Repository) CanOrder(ctx context.Context, userID string) error {
+	return checkCustomer(ctx, r.db, userID)
+}
+
+type queryRower interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func checkCustomer(ctx context.Context, q queryRower, userID string) error {
+	var role, status string
+	var verified bool
+	err := q.QueryRow(ctx,
+		`SELECT role, status, email_verified_at IS NOT NULL FROM users WHERE id = $1`, userID).
+		Scan(&role, &status, &verified)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotCustomer
+	}
+	if err != nil {
+		return wrap("check customer", err)
+	}
+	if role != "customer" || status != "active" {
+		return ErrNotCustomer
+	}
+	if !verified {
+		return ErrEmailNotVerified
+	}
+	return nil
+}
+
+// lockCartLines membaca item keranjang (semua atau sesuai ids) dan mengunci
+// baris keranjang & varian sampai transaksi selesai.
 func lockCartLines(ctx context.Context, tx pgx.Tx, userID string, ids []string) ([]cartLine, error) {
 	query := `SELECT ci.id, v.id, ci.quantity, v.stock, v.size, p.id, p.name, p.status,
 	                 ` + unitPrice + `::text, (` + unitPrice + ` * ci.quantity)::text,
@@ -178,7 +230,6 @@ func lockCartLines(ctx context.Context, tx pgx.Tx, userID string, ids []string) 
 		query += ` AND ci.id = ANY($2::uuid[])`
 		args = append(args, ids)
 	}
-	// Urutan tetap (per varian) mencegah deadlock antar transaksi checkout.
 	query += ` ORDER BY v.id, ci.id FOR UPDATE OF ci, v`
 
 	rows, err := tx.Query(ctx, query, args...)
@@ -202,35 +253,42 @@ func lockCartLines(ctx context.Context, tx pgx.Tx, userID string, ids []string) 
 	return lines, nil
 }
 
-// List mengambil satu halaman order yang cocok dengan f beserta totalnya,
-// terbaru lebih dulu (nomor order diawali tanggal & jam pembuatan).
-func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]Order, int, error) {
+const listSelect = `SELECT %s,
+	       (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi WHERE oi.order_id = o.id),
+	       pay.status, COALESCE(pay.has_proof, false), u.email
+	  FROM orders o
+	  JOIN users u ON u.id = o.user_id
+	  LEFT JOIN LATERAL (SELECT p.status, p.proof_data IS NOT NULL AS has_proof
+	                       FROM payments p WHERE p.order_id = o.id
+	                      ORDER BY p.created_at, p.id LIMIT 1) pay ON true`
+
+// List mengembalikan order sesuai filter, terbaru dulu.
+func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]ListItem, int, error) {
 	var conds []string
 	var args []any
 	add := func(cond string, v any) {
 		args = append(args, v)
-		conds = append(conds, fmt.Sprintf(cond, len(args)))
+		conds = append(conds, strings.ReplaceAll(cond, "$?", fmt.Sprintf("$%d", len(args))))
 	}
 	if f.UserID != "" {
-		add("user_id = $%d", f.UserID)
+		add("o.user_id = $?", f.UserID)
 	}
 	if f.Status != "" {
-		add("order_status = $%d", f.Status)
+		add("o.order_status = $?", f.Status)
 	}
-	if f.OrderNumber != "" {
-		add("order_number = $%d", f.OrderNumber)
+	if f.Q != "" {
+		add(`(o.order_number ILIKE $? ESCAPE '\' OR o.recipient_name ILIKE $? ESCAPE '\')`, "%"+escapeLike(f.Q)+"%")
 	}
 	where := ""
 	if len(conds) > 0 {
 		where = " WHERE " + strings.Join(conds, " AND ")
 	}
 
-	// Total dan halaman diambil dalam satu perjalanan ke database (pgx.Batch).
 	pageArgs := append(append([]any{}, args...), limit, offset)
 	b := &pgx.Batch{}
-	b.Queue("SELECT COUNT(*) FROM orders"+where, args...)
-	b.Queue(fmt.Sprintf("SELECT %s FROM orders%s ORDER BY order_number DESC LIMIT $%d OFFSET $%d",
-		orderColumns, where, len(pageArgs)-1, len(pageArgs)), pageArgs...)
+	b.Queue("SELECT COUNT(*) FROM orders o"+where, args...)
+	b.Queue(fmt.Sprintf(listSelect, orderColumns)+where+
+		fmt.Sprintf(" ORDER BY o.created_at DESC, o.id LIMIT $%d OFFSET $%d", len(pageArgs)-1, len(pageArgs)), pageArgs...)
 	br := r.db.SendBatch(ctx, b)
 	defer br.Close()
 
@@ -242,17 +300,30 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]O
 	if err != nil {
 		return nil, 0, wrap("list", err)
 	}
-	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Order, error) { return scanOrder(row) })
+	out, err := collectListItems(rows)
 	if err != nil {
-		return nil, 0, wrap("list scan", err)
-	}
-	if out == nil {
-		out = []Order{}
+		return nil, 0, err
 	}
 	return out, total, nil
 }
 
-// Items mengambil seluruh item order.
+func collectListItems(rows pgx.Rows) ([]ListItem, error) {
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (ListItem, error) {
+		var it ListItem
+		dst := append(orderDest(&it.Order), &it.ItemCount, &it.PaymentStatus, &it.HasProof, &it.CustomerEmail)
+		err := row.Scan(dst...)
+		return it, err
+	})
+	if err != nil {
+		return nil, wrap("list scan", err)
+	}
+	if out == nil {
+		out = []ListItem{}
+	}
+	return out, nil
+}
+
+// Items mengembalikan item sebuah order.
 func (r *Repository) Items(ctx context.Context, orderID string) ([]Item, error) {
 	rows, err := r.db.Query(ctx, itemsQuery, orderID)
 	if err != nil {
@@ -261,11 +332,10 @@ func (r *Repository) Items(ctx context.Context, orderID string) ([]Item, error) 
 	return collectItems(rows)
 }
 
-// GetWithItems mengambil order beserta itemnya dalam satu perjalanan ke
-// database (pgx.Batch). ErrNotFound bila order tidak ada.
+// GetWithItems mengambil order dan item-itemnya dalam satu round trip.
 func (r *Repository) GetWithItems(ctx context.Context, id string) (Order, []Item, error) {
 	b := &pgx.Batch{}
-	b.Queue("SELECT "+orderColumns+" FROM orders WHERE id = $1", id)
+	b.Queue("SELECT "+orderColumns+" FROM orders o WHERE o.id = $1", id)
 	b.Queue(itemsQuery, id)
 	br := r.db.SendBatch(ctx, b)
 	defer br.Close()
@@ -285,12 +355,11 @@ func (r *Repository) GetWithItems(ctx context.Context, id string) (Order, []Item
 	return o, items, nil
 }
 
-// collectItems membaca baris order_items menjadi slice (tidak pernah nil).
 func collectItems(rows pgx.Rows) ([]Item, error) {
 	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Item, error) {
 		var it Item
 		err := row.Scan(&it.ID, &it.OrderID, &it.ProductID, &it.VariantID, &it.ProductName,
-			&it.Size, &it.UnitPrice, &it.Quantity, &it.Subtotal)
+			&it.Size, &it.UnitPrice, &it.Quantity, &it.Subtotal, &it.ImageURL)
 		return it, err
 	})
 	if err != nil {
@@ -302,32 +371,55 @@ func collectItems(rows pgx.Rows) ([]Item, error) {
 	return out, nil
 }
 
-// UpdateStatus mengubah status order bila transisinya diizinkan. Saat order
-// dibatalkan, stok setiap varian dikembalikan dalam transaksi yang sama.
-// onUpdate (boleh nil) dijalankan di transaksi yang sama setelah status
-// berubah, misalnya untuk menyimpan resi; bila gagal, semuanya dibatalkan.
-func (r *Repository) UpdateStatus(ctx context.Context, id, to string, onUpdate func(context.Context, pgx.Tx, Order) error) (Order, error) {
+// change menggambarkan satu perubahan status order.
+type change struct {
+	to string
+	// ownerID, bila diisi, mewajibkan order milik user tersebut.
+	ownerID string
+	// allowed menggantikan aturan transitions (mis. aksi pelanggan).
+	allowed func(from string) bool
+	// guard menjalankan pemeriksaan tambahan di dalam transaksi.
+	guard  func(ctx context.Context, tx pgx.Tx, id string) error
+	reason *string
+	// onUpdate dijalankan setelah status diperbarui (mis. simpan resi).
+	onUpdate func(context.Context, pgx.Tx, Order) error
+}
+
+// transition mengubah status order secara atomik: mengunci order, memeriksa
+// aturan, mengembalikan stok bila dibatalkan, lalu menyimpan status baru.
+func (r *Repository) transition(ctx context.Context, id string, c change) (Order, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return Order{}, wrap("update status begin", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	var from string
-	err = tx.QueryRow(ctx, `SELECT order_status FROM orders WHERE id = $1 FOR UPDATE`, id).Scan(&from)
+	var from, owner string
+	err = tx.QueryRow(ctx, `SELECT order_status, user_id FROM orders WHERE id = $1 FOR UPDATE`, id).Scan(&from, &owner)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Order{}, ErrNotFound
 	}
 	if err != nil {
 		return Order{}, wrap("update status lock", err)
 	}
-	if !canTransition(from, to) {
+	if c.ownerID != "" && owner != c.ownerID {
+		return Order{}, ErrNotFound
+	}
+	allowed := canTransition(from, c.to)
+	if c.allowed != nil {
+		allowed = c.allowed(from)
+	}
+	if !allowed {
 		return Order{}, ErrInvalidTransition
 	}
+	if c.guard != nil {
+		if err := c.guard(ctx, tx, id); err != nil {
+			return Order{}, err
+		}
+	}
 
-	if to == StatusCancelled {
-		// Dijumlah per varian dulu: UPDATE ... FROM hanya memakai satu baris
-		// pasangan per target, jadi item ganda tidak boleh dibiarkan terpisah.
+	if c.to == StatusCancelled {
+		// Stok dikembalikan sesuai jumlah yang dipesan.
 		_, err := tx.Exec(ctx,
 			`UPDATE product_variants v
 			    SET stock = v.stock + s.qty
@@ -341,23 +433,140 @@ func (r *Repository) UpdateStatus(ctx context.Context, id, to string, onUpdate f
 	}
 
 	o, err := scanOrder(tx.QueryRow(ctx,
-		"UPDATE orders SET order_status = $2 WHERE id = $1 RETURNING "+orderColumns, id, to))
+		`UPDATE orders AS o
+		    SET order_status = $2, updated_at = now(),
+		        cancel_reason = CASE WHEN $2 = 'cancelled' THEN $3 ELSE o.cancel_reason END
+		  WHERE o.id = $1
+		  RETURNING `+orderColumns, id, c.to, c.reason))
 	if err != nil {
 		return Order{}, wrap("update status", err)
 	}
-	if onUpdate != nil {
-		if err := onUpdate(ctx, tx, o); err != nil {
+	if c.onUpdate != nil {
+		if err := c.onUpdate(ctx, tx, o); err != nil {
 			return Order{}, err
 		}
 	}
-
 	if err := tx.Commit(ctx); err != nil {
 		return Order{}, wrap("update status commit", err)
 	}
 	return o, nil
 }
 
-// contactOf mengambil email & nama pemilik order untuk notifikasi.
+// noProofUnderReview menolak pembatalan bila bukti bayar sedang menunggu
+// verifikasi admin (pelanggan mungkin sudah membayar).
+func noProofUnderReview(ctx context.Context, tx pgx.Tx, id string) error {
+	var reviewing bool
+	err := tx.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM payments
+		                 WHERE order_id = $1 AND status = 'pending' AND proof_data IS NOT NULL)`, id).Scan(&reviewing)
+	if err != nil {
+		return wrap("check proof", err)
+	}
+	if reviewing {
+		return ErrProofUnderReview
+	}
+	return nil
+}
+
+// ExpiredIDs mengembalikan order menunggu pembayaran yang batas bayarnya lewat.
+func (r *Repository) ExpiredIDs(ctx context.Context, limit int) ([]string, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT id FROM orders
+		  WHERE order_status = $1 AND payment_due_at < now()
+		  ORDER BY payment_due_at LIMIT $2`, StatusPendingPayment, limit)
+	if err != nil {
+		return nil, wrap("expired ids", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, wrap("expired ids scan", err)
+	}
+	return ids, nil
+}
+
+// stillExpired memastikan order masih lewat batas bayar saat dikunci.
+func stillExpired(ctx context.Context, tx pgx.Tx, id string) error {
+	var expired bool
+	if err := tx.QueryRow(ctx,
+		`SELECT payment_due_at < now() FROM orders WHERE id = $1`, id).Scan(&expired); err != nil {
+		return wrap("check expiry", err)
+	}
+	if !expired {
+		return ErrInvalidTransition
+	}
+	return noProofUnderReview(ctx, tx, id)
+}
+
+// Summary menghitung ringkasan operasional untuk dashboard admin.
+func (r *Repository) Summary(ctx context.Context) (Summary, error) {
+	s := Summary{StatusCounts: map[string]int{}}
+	b := &pgx.Batch{}
+	b.Queue(`SELECT order_status, COUNT(*) FROM orders GROUP BY order_status`)
+	b.Queue(`SELECT COUNT(*) FROM payments p JOIN orders o ON o.id = p.order_id
+	          WHERE p.status = 'pending' AND p.proof_data IS NOT NULL AND o.order_status = 'pending_payment'`)
+	b.Queue(`SELECT COUNT(*) FROM orders WHERE created_at >= date_trunc('day', now())`)
+	b.Queue(`SELECT COALESCE(SUM(total_amount), 0)::text, COUNT(*) FROM orders
+	          WHERE order_status IN ('paid', 'processing', 'shipped', 'completed')
+	            AND created_at >= date_trunc('month', now())`)
+	b.Queue(`SELECT p.id, p.name, v.id, v.sku, v.size, v.color, v.stock
+	           FROM product_variants v JOIN products p ON p.id = v.product_id
+	          WHERE p.status = 'active' AND v.stock <= $1
+	          ORDER BY v.stock, p.name, v.size LIMIT 12`, lowStockThreshold)
+	b.Queue(fmt.Sprintf(listSelect, orderColumns) + " ORDER BY o.created_at DESC, o.id LIMIT 6")
+	br := r.db.SendBatch(ctx, b)
+	defer br.Close()
+
+	rows, err := br.Query()
+	if err != nil {
+		return Summary{}, wrap("summary status", err)
+	}
+	for rows.Next() {
+		var st string
+		var n int
+		if err := rows.Scan(&st, &n); err != nil {
+			rows.Close()
+			return Summary{}, wrap("summary status scan", err)
+		}
+		s.StatusCounts[st] = n
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return Summary{}, wrap("summary status rows", err)
+	}
+	if err := br.QueryRow().Scan(&s.ProofsToReview); err != nil {
+		return Summary{}, wrap("summary proofs", err)
+	}
+	if err := br.QueryRow().Scan(&s.OrdersToday); err != nil {
+		return Summary{}, wrap("summary today", err)
+	}
+	if err := br.QueryRow().Scan(&s.RevenueMonth, &s.PaidOrdersMonth); err != nil {
+		return Summary{}, wrap("summary revenue", err)
+	}
+	lowRows, err := br.Query()
+	if err != nil {
+		return Summary{}, wrap("summary low stock", err)
+	}
+	s.LowStock, err = pgx.CollectRows(lowRows, func(row pgx.CollectableRow) (LowStock, error) {
+		var l LowStock
+		err := row.Scan(&l.ProductID, &l.ProductName, &l.VariantID, &l.SKU, &l.Size, &l.Color, &l.Stock)
+		return l, err
+	})
+	if err != nil {
+		return Summary{}, wrap("summary low stock scan", err)
+	}
+	if s.LowStock == nil {
+		s.LowStock = []LowStock{}
+	}
+	recent, err := br.Query()
+	if err != nil {
+		return Summary{}, wrap("summary recent", err)
+	}
+	if s.Recent, err = collectListItems(recent); err != nil {
+		return Summary{}, err
+	}
+	return s, nil
+}
+
 func (r *Repository) contactOf(ctx context.Context, orderID string) (contact, error) {
 	var c contact
 	err := r.db.QueryRow(ctx,
@@ -369,20 +578,24 @@ func (r *Repository) contactOf(ctx context.Context, orderID string) (contact, er
 	return c, nil
 }
 
-func scanOrder(row pgx.Row) (Order, error) {
-	var o Order
-	err := row.Scan(&o.ID, &o.OrderNumber, &o.UserID, &o.RecipientName, &o.RecipientPhone,
+func orderDest(o *Order) []any {
+	return []any{&o.ID, &o.OrderNumber, &o.UserID, &o.RecipientName, &o.RecipientPhone,
 		&o.ShippingAddress, &o.ShippingCity, &o.ShippingKelurahan, &o.Subtotal, &o.ShippingCost,
 		&o.TotalAmount, &o.OrderStatus,
 		&o.ShippingProvince, &o.ShippingDistrict, &o.ShippingSubdistrictID, &o.ShippingZipCode,
-		&o.CourierCode, &o.CourierService, &o.ShippingETD, &o.ShippingWeightGram)
+		&o.CourierCode, &o.CourierService, &o.ShippingETD, &o.ShippingWeightGram,
+		&o.CreatedAt, &o.UpdatedAt, &o.PaymentDueAt, &o.CancelReason}
+}
+
+func scanOrder(row pgx.Row) (Order, error) {
+	var o Order
+	err := row.Scan(orderDest(&o)...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Order{}, ErrNotFound
 	}
 	return o, err
 }
 
-// nullIfEmpty mengubah string kosong menjadi NULL di database.
 func nullIfEmpty(s string) *string {
 	if s == "" {
 		return nil
@@ -390,7 +603,22 @@ func nullIfEmpty(s string) *string {
 	return &s
 }
 
-// wrap menambahkan konteks operasi tetapi membiarkan error domain tetap utuh.
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
+}
+
+// paymentDeadlineLabel memformat batas bayar untuk email (WIB).
+func paymentDeadlineLabel(t *time.Time) string {
+	if t == nil {
+		return "-"
+	}
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		loc = time.FixedZone("WIB", 7*3600)
+	}
+	return t.In(loc).Format("02 Jan 2006, 15:04") + " WIB"
+}
+
 func wrap(op string, err error) error {
 	if errors.Is(err, ErrNotFound) {
 		return err
