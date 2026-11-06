@@ -55,9 +55,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.Method = strings.TrimSpace(req.Method)
-	if req.Method != MethodBankTransfer && req.Method != MethodEWallet {
+	if req.Method == "" {
+		req.Method = MethodQRIS
+	}
+	if req.Method != MethodQRIS {
 		validationFailed(w, response.FieldError{Field: "method",
-			Message: "method harus " + MethodBankTransfer + " atau " + MethodEWallet + "."})
+			Message: "Pembayaran hanya melalui QRIS (method: " + MethodQRIS + ")."})
 		return
 	}
 

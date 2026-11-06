@@ -10,8 +10,10 @@ import (
 // Nilai role dan status yang dipakai aplikasi. Kolom di database bertipe TEXT
 // tanpa constraint, jadi nilai-nilai ini hanya dijaga oleh aplikasi.
 const (
-	RoleCustomer   = "customer"
-	RoleAdmin      = "admin"
+	RoleCustomer = "customer"
+	RoleAdmin    = "admin"
+	// RoleCopywriter hanya boleh mengelola jurnal/artikel, tidak bisa belanja.
+	RoleCopywriter = "copywriter"
 	StatusActive   = "active"
 	StatusInactive = "inactive"
 )
@@ -26,6 +28,8 @@ var (
 	// ErrSelfLockout berarti admin mencoba menurunkan role atau menonaktifkan
 	// akunnya sendiri.
 	ErrSelfLockout = errors.New("user: admin cannot demote or deactivate self")
+	// ErrInvalidVerification: token verifikasi email tidak dikenal atau kedaluwarsa.
+	ErrInvalidVerification = errors.New("user: invalid or expired verification token")
 )
 
 // OptionalString membedakan field JSON yang tidak dikirim (Set false), yang
@@ -86,6 +90,7 @@ type User struct {
 	Role            string
 	Status          string
 	EmailVerifiedAt *time.Time
+	CreatedAt       time.Time
 }
 
 // Response adalah bentuk user di API (schema User pada openapi.yaml).
@@ -97,6 +102,7 @@ type Response struct {
 	Role            string     `json:"role"`
 	Status          string     `json:"status"`
 	EmailVerifiedAt *time.Time `json:"email_verified_at"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
 // Response mengubah User menjadi bentuk yang aman dikirim ke client.
@@ -109,5 +115,6 @@ func (u User) Response() Response {
 		Role:            u.Role,
 		Status:          u.Status,
 		EmailVerifiedAt: u.EmailVerifiedAt,
+		CreatedAt:       u.CreatedAt,
 	}
 }

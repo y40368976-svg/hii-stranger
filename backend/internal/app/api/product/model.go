@@ -39,6 +39,9 @@ type Product struct {
 
 	// PrimaryImageURL hanya diisi oleh List (diturunkan dari product_images).
 	PrimaryImageURL *string
+	// TotalStock & VariantCount hanya diisi di daftar produk.
+	TotalStock   int
+	VariantCount int
 }
 
 // Response adalah bentuk produk di API (schema Product pada openapi.yaml).
@@ -75,6 +78,9 @@ func (p Product) Response() Response {
 type ListItem struct {
 	Response
 	PrimaryImageURL *string `json:"primary_image_url"`
+	// TotalStock adalah jumlah stok semua varian; 0 berarti habis.
+	TotalStock   int `json:"total_stock"`
+	VariantCount int `json:"variant_count"`
 }
 
 // Detail adalah produk beserta varian dan gambarnya (schema ProductDetail).

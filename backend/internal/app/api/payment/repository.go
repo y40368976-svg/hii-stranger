@@ -13,7 +13,7 @@ import (
 // paymentColumns sengaja tidak memuat proof_data supaya berkas besar tidak
 // ikut terbaca; cukup tanda ada atau tidaknya.
 const paymentColumns = `p.id, p.order_id, p.method, p.amount::text, p.unique_code, p.proof_type,
-	p.proof_data IS NOT NULL, p.status, p.paid_at, p.reviewed_by, p.reviewed_at`
+	p.proof_data IS NOT NULL, p.status, p.paid_at, p.reviewed_by, p.reviewed_at, p.created_at`
 
 // Repository mengakses tabel payments (dan membaca/mengubah orders seperlunya).
 type Repository struct {
@@ -173,7 +173,7 @@ func (r *Repository) GetProof(ctx context.Context, orderID string) (Proof, error
 
 // List mengambil satu halaman pembayaran (antrean verifikasi admin). Yang
 // menunggu verifikasi (pending dengan bukti) diletakkan paling atas.
-func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]Payment, int, error) {
+func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]AdminItem, int, error) {
 	var conds []string
 	var args []any
 	add := func(cond string, v any) {
@@ -198,9 +198,12 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]P
 
 	args = append(args, limit, offset)
 	rows, err := r.db.Query(ctx,
-		fmt.Sprintf(`SELECT %s FROM payments p%s
+		fmt.Sprintf(`SELECT %s, o.order_number, o.order_status, o.total_amount::text, o.payment_due_at, u.name, u.email
+		   FROM payments p
+		   JOIN orders o ON o.id = p.order_id
+		   JOIN users u ON u.id = o.user_id%s
 		 ORDER BY (p.status = 'pending' AND p.proof_data IS NOT NULL) DESC,
-		          p.paid_at DESC NULLS LAST, p.id
+		          p.paid_at DESC NULLS LAST, p.created_at DESC, p.id
 		 LIMIT $%d OFFSET $%d`, paymentColumns, where, len(args)-1, len(args)),
 		args...)
 	if err != nil {
@@ -208,13 +211,16 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]P
 	}
 	defer rows.Close()
 
-	out := make([]Payment, 0, limit)
+	out := make([]AdminItem, 0, limit)
 	for rows.Next() {
-		p, err := scanPayment(rows)
-		if err != nil {
+		var it AdminItem
+		p := &it.Payment
+		if err := rows.Scan(&p.ID, &p.OrderID, &p.Method, &p.Amount, &p.UniqueCode, &p.ProofType,
+			&p.HasProof, &p.Status, &p.PaidAt, &p.ReviewedBy, &p.ReviewedAt, &p.CreatedAt,
+			&it.OrderNumber, &it.OrderStatus, &it.OrderTotal, &it.PaymentDueAt, &it.CustomerName, &it.CustomerEmail); err != nil {
 			return nil, 0, wrap("list scan", err)
 		}
-		out = append(out, p)
+		out = append(out, it)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, 0, wrap("list rows", err)
@@ -222,8 +228,6 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]P
 	return out, total, nil
 }
 
-// Review menyimpan hasil verifikasi admin. Bila disetujui, status order ikut
-// berubah menjadi paid dalam transaksi yang sama.
 func (r *Repository) Review(ctx context.Context, paymentID, adminID, status string) (Payment, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -260,7 +264,7 @@ func (r *Repository) Review(ctx context.Context, paymentID, adminID, status stri
 			return Payment{}, ErrOrderNotPayable
 		}
 		if _, err := tx.Exec(ctx,
-			`UPDATE orders SET order_status = $2 WHERE id = $1`, orderID, orderStatusPaid); err != nil {
+			`UPDATE orders SET order_status = $2, updated_at = now() WHERE id = $1`, orderID, orderStatusPaid); err != nil {
 			return Payment{}, wrap("review update order", err)
 		}
 	}
@@ -297,7 +301,7 @@ func (r *Repository) contactOf(ctx context.Context, orderID string) (contact, er
 func scanPayment(row pgx.Row) (Payment, error) {
 	var p Payment
 	err := row.Scan(&p.ID, &p.OrderID, &p.Method, &p.Amount, &p.UniqueCode, &p.ProofType,
-		&p.HasProof, &p.Status, &p.PaidAt, &p.ReviewedBy, &p.ReviewedAt)
+		&p.HasProof, &p.Status, &p.PaidAt, &p.ReviewedBy, &p.ReviewedAt, &p.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Payment{}, ErrNotFound
 	}

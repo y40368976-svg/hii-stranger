@@ -2,7 +2,10 @@
 // Satu order hanya punya satu pengiriman (UNIQUE order_id).
 package shipment
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 var (
 	// ErrNotFound berarti order belum punya data pengiriman.
@@ -27,12 +30,13 @@ const (
 
 // Shipment adalah satu baris tabel shipments (schema Shipment).
 type Shipment struct {
-	ID             string  `json:"id"`
-	OrderID        string  `json:"order_id"`
-	CourierName    string  `json:"courier_name"`
-	TrackingNumber *string `json:"tracking_number"`
-	CoverageStatus string  `json:"coverage_status"`
-	ShippingStatus string  `json:"shipping_status"`
+	ID             string    `json:"id"`
+	OrderID        string    `json:"order_id"`
+	CourierName    string    `json:"courier_name"`
+	TrackingNumber *string   `json:"tracking_number"`
+	CoverageStatus string    `json:"coverage_status"`
+	ShippingStatus string    `json:"shipping_status"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // upsertRequest adalah body PUT /orders/{orderId}/shipment.

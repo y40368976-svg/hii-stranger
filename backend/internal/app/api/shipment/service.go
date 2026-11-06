@@ -2,10 +2,10 @@ package shipment
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
 	"hii-stranger1/backend/internal/pkg/mailer"
+	"hii-stranger1/backend/internal/pkg/tracking"
 )
 
 // Service berisi logika bisnis pengiriman.
@@ -41,15 +41,39 @@ func (s *Service) Upsert(ctx context.Context, in Shipment) (Shipment, bool, erro
 	}
 
 	if c, err := s.repo.contactOf(ctx, out.OrderID); err == nil {
-		resi := "-"
-		if out.TrackingNumber != nil {
-			resi = *out.TrackingNumber
+		e := mailer.Email{
+			Heading:    "Info pengiriman diperbarui",
+			Paragraphs: []string{"Halo " + c.Name + ", ada pembaruan pengiriman untuk pesanan " + c.OrderNumber + "."},
+			Details: [][2]string{
+				{"No. order", c.OrderNumber},
+				{"Kurir", out.CourierName},
+				{"Status kirim", shippingLabel(out.ShippingStatus)},
+			},
+			Button: &mailer.Link{Label: "Lihat pesanan", URL: s.mail.AppURL("/orders/" + out.OrderID)},
 		}
-		s.mail.Notify(c.Email, "Update pengiriman order "+c.OrderNumber,
-			fmt.Sprintf("Halo %s,\n\nInfo pengiriman order %s:\nKurir: %s\nNo. resi: %s\nStatus: %s\n\nTerima kasih!",
-				c.Name, c.OrderNumber, out.CourierName, resi, out.ShippingStatus))
+		if out.TrackingNumber != nil {
+			e.Details = append(e.Details, [2]string{"No. resi", *out.TrackingNumber})
+			for _, l := range tracking.Links(out.CourierName, *out.TrackingNumber) {
+				e.Links = append(e.Links, mailer.Link{Label: l.Label, URL: l.URL})
+			}
+		}
+		s.mail.NotifyEmail(c.Email, "Update pengiriman pesanan "+c.OrderNumber, e)
 	} else {
 		slog.WarnContext(ctx, "shipment: load contact for email failed", "error", err)
 	}
 	return out, created, nil
+}
+
+func shippingLabel(s string) string {
+	switch s {
+	case ShippingPending:
+		return "Menunggu pickup"
+	case ShippingShipped:
+		return "Dalam perjalanan"
+	case ShippingDelivered:
+		return "Diterima"
+	case ShippingReturned:
+		return "Dikembalikan"
+	}
+	return s
 }

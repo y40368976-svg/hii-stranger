@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/mail"
 	"net/smtp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -29,16 +30,27 @@ type Mailer struct {
 	pass  string
 	from  string
 	owner string
+	app   string
 }
 
 // New membuat Mailer. from boleh berbentuk "Nama Toko <alamat@gmail.com>";
 // bila kosong, user dipakai sebagai pengirim. owner adalah email pemilik toko
 // yang menerima notifikasi order dan pembayaran baru.
-func New(host, port, user, pass, from, owner string) *Mailer {
+func New(host, port, user, pass, from, owner, appURL string) *Mailer {
 	if from == "" {
 		from = user
 	}
-	return &Mailer{host: host, port: port, user: user, pass: pass, from: from, owner: owner}
+	return &Mailer{host: host, port: port, user: user, pass: pass, from: from, owner: owner,
+		app: strings.TrimRight(appURL, "/")}
+}
+
+// AppURL menggabungkan alamat frontend (FRONTEND_URL) dengan path, untuk
+// tautan di email (mis. /orders/{id}). Kosong bila FRONTEND_URL tidak diisi.
+func (m *Mailer) AppURL(path string) string {
+	if m == nil || m.app == "" {
+		return ""
+	}
+	return m.app + path
 }
 
 // Enabled bernilai true bila SMTP sudah dikonfigurasi.
@@ -49,13 +61,31 @@ func (m *Mailer) Enabled() bool {
 // Notify mengirim email di background supaya response API tidak ikut menunggu
 // server SMTP. Kegagalan hanya dicatat ke log karena email bersifat tambahan.
 func (m *Mailer) Notify(to, subject, body string) {
+	m.notify(to, subject, body, "")
+}
+
+// NotifyEmail mengirim Email (versi teks + HTML) di background, seperti Notify.
+func (m *Mailer) NotifyEmail(to, subject string, e Email) {
+	text, html := e.Render()
+	m.notify(to, subject, text, html)
+}
+
+// NotifyOwnerEmail sama dengan NotifyEmail, dengan penerima email pemilik toko.
+func (m *Mailer) NotifyOwnerEmail(subject string, e Email) {
+	if m == nil {
+		return
+	}
+	m.NotifyEmail(m.owner, subject, e)
+}
+
+func (m *Mailer) notify(to, subject, text, html string) {
 	if !m.Enabled() || to == "" {
 		return
 	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 		defer cancel()
-		if err := m.Send(ctx, to, subject, body); err != nil {
+		if err := m.send(ctx, to, subject, text, html); err != nil {
 			slog.Error("mailer: send failed", "subject", subject, "error", err)
 		}
 	}()
@@ -72,6 +102,10 @@ func (m *Mailer) NotifyOwner(subject, body string) {
 // Send mengirim satu email teks biasa dan menunggu sampai selesai. Port 465
 // memakai TLS langsung; port lain (mis. 587) memakai STARTTLS.
 func (m *Mailer) Send(ctx context.Context, to, subject, body string) error {
+	return m.send(ctx, to, subject, body, "")
+}
+
+func (m *Mailer) send(ctx context.Context, to, subject, body, htmlBody string) error {
 	if !m.Enabled() {
 		return nil
 	}
@@ -123,7 +157,7 @@ func (m *Mailer) Send(ctx context.Context, to, subject, body string) error {
 	if err != nil {
 		return fmt.Errorf("mailer: data: %w", err)
 	}
-	if _, err := w.Write(buildMessage(fromAddr.String(), toAddr.String(), subject, body)); err != nil {
+	if _, err := w.Write(buildMessage(fromAddr.String(), toAddr.String(), subject, body, htmlBody)); err != nil {
 		return fmt.Errorf("mailer: write body: %w", err)
 	}
 	if err := w.Close(); err != nil {
@@ -153,9 +187,11 @@ func (m *Mailer) dial(ctx context.Context) (net.Conn, error) {
 
 // buildMessage menyusun header dan isi email. Subject di-encode supaya huruf
 // non-ASCII aman, dan baris baru dibuang agar header tidak bisa disisipi.
-func buildMessage(from, to, subject, body string) []byte {
+func buildMessage(from, to, subject, body, htmlBody string) []byte {
 	subject = strings.NewReplacer("\r", " ", "\n", " ").Replace(subject)
-	body = strings.ReplaceAll(strings.ReplaceAll(body, "\r\n", "\n"), "\n", "\r\n")
+	crlf := func(v string) string {
+		return strings.ReplaceAll(strings.ReplaceAll(v, "\r\n", "\n"), "\n", "\r\n")
+	}
 
 	var b strings.Builder
 	b.WriteString("From: " + from + "\r\n")
@@ -163,10 +199,27 @@ func buildMessage(from, to, subject, body string) []byte {
 	b.WriteString("Subject: " + mime.QEncoding.Encode("utf-8", subject) + "\r\n")
 	b.WriteString("Date: " + time.Now().Format(time.RFC1123Z) + "\r\n")
 	b.WriteString("MIME-Version: 1.0\r\n")
+	if htmlBody == "" {
+		b.WriteString("Content-Type: text/plain; charset=utf-8\r\n")
+		b.WriteString("Content-Transfer-Encoding: 8bit\r\n")
+		b.WriteString("\r\n")
+		b.WriteString(crlf(body))
+		b.WriteString("\r\n")
+		return []byte(b.String())
+	}
+
+	// multipart/alternative: klien email memilih versi HTML bila didukung.
+	boundary := "hs-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	b.WriteString("Content-Type: multipart/alternative; boundary=\"" + boundary + "\"\r\n")
+	b.WriteString("\r\n")
+	b.WriteString("--" + boundary + "\r\n")
 	b.WriteString("Content-Type: text/plain; charset=utf-8\r\n")
-	b.WriteString("Content-Transfer-Encoding: 8bit\r\n")
-	b.WriteString("\r\n")
-	b.WriteString(body)
-	b.WriteString("\r\n")
+	b.WriteString("Content-Transfer-Encoding: 8bit\r\n\r\n")
+	b.WriteString(crlf(body) + "\r\n")
+	b.WriteString("--" + boundary + "\r\n")
+	b.WriteString("Content-Type: text/html; charset=utf-8\r\n")
+	b.WriteString("Content-Transfer-Encoding: 8bit\r\n\r\n")
+	b.WriteString(crlf(htmlBody) + "\r\n")
+	b.WriteString("--" + boundary + "--\r\n")
 	return []byte(b.String())
 }

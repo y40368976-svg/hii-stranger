@@ -2,16 +2,28 @@ package middleware
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
-// maxCachedBody membatasi ukuran satu response yang disimpan di cache.
-const maxCachedBody = 1 << 20
+const (
+	// maxCachedBody membatasi ukuran satu response yang disimpan di cache.
+	maxCachedBody = 1 << 20
 
-// ResponseCache menyimpan response GET publik di memori (microcache) supaya
+	// flushTimeout membatasi waktu pengosongan cache setelah request tulis.
+	flushTimeout = 2 * time.Second
+
+	defaultCachePrefix = "cache:resp:"
+)
+
+// ResponseCache menyimpan response GET publik di Redis (microcache) supaya
 // endpoint yang paling sering dibuka (produk, kategori, banner) tidak selalu
 // menunggu database.
 //
@@ -21,29 +33,24 @@ const maxCachedBody = 1 << 20
 //   - Hanya response 200 yang disimpan, paling lama ttl.
 //   - Setiap request tulis yang sukses (POST/PUT/PATCH/DELETE) di endpoint
 //     mana pun mengosongkan seluruh cache, termasuk checkout yang mengubah stok.
-//   - Cache ada di memori satu instance. Bila server dijalankan lebih dari satu
-//     instance, instance lain baru ikut segar setelah ttl habis.
+//   - Cache ada di Redis, jadi pengosongan berlaku untuk semua instance.
+//
+// Pengosongan memakai nomor generasi: setiap key memuat generasi saat ini,
+// dan Flush cukup menaikkan generasi (INCR) tanpa menghapus key satu per satu.
+// Key generasi lama tidak dibaca lagi dan hilang sendiri setelah ttl. Response
+// yang mulai dibuat sebelum pengosongan tersimpan di generasi lama, sehingga
+// data lama tidak pernah masuk lagi ke cache yang baru.
+//
+// Bila Redis bermasalah, request tetap dilayani langsung dari handler.
 type ResponseCache struct {
-	ttl        time.Duration
-	maxEntries int
-
-	mu      sync.RWMutex
-	entries map[string]cachedResponse
-	// gen naik setiap cache dikosongkan. Response yang mulai dibuat sebelum
-	// pengosongan tidak disimpan, supaya data lama tidak masuk lagi.
-	gen uint64
+	rdb    *redis.Client
+	ttl    time.Duration
+	prefix string
 }
 
-type cachedResponse struct {
-	body        []byte
-	contentType string
-	expires     time.Time
-}
-
-// NewResponseCache membuat cache dengan masa simpan ttl dan jumlah entri
-// maksimal maxEntries.
-func NewResponseCache(ttl time.Duration, maxEntries int) *ResponseCache {
-	return &ResponseCache{ttl: ttl, maxEntries: maxEntries, entries: map[string]cachedResponse{}}
+// NewResponseCache membuat cache di Redis dengan masa simpan ttl.
+func NewResponseCache(rdb *redis.Client, ttl time.Duration) *ResponseCache {
+	return &ResponseCache{rdb: rdb, ttl: ttl, prefix: defaultCachePrefix}
 }
 
 // Cached dipasang pada rute GET publik yang boleh di-cache. Header X-Cache
@@ -56,30 +63,41 @@ func (c *ResponseCache) Cached() Middleware {
 				return
 			}
 
-			key := r.URL.RequestURI()
-			c.mu.RLock()
-			e, ok := c.entries[key]
-			gen := c.gen
-			c.mu.RUnlock()
+			ctx := r.Context()
+			gen, err := c.generation(ctx)
+			if err != nil {
+				logCacheErr(ctx, "read generation", err)
+				next.ServeHTTP(w, r)
+				return
+			}
 
-			if ok && time.Now().Before(e.expires) {
-				h := w.Header()
-				h.Set("Content-Type", e.contentType)
-				h.Set("X-Cache", "HIT")
-				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write(e.body)
+			key := c.entryKey(gen, r.URL.RequestURI())
+			raw, err := c.rdb.Get(ctx, key).Bytes()
+			switch {
+			case err == nil:
+				if contentType, body, ok := decodeEntry(raw); ok {
+					h := w.Header()
+					h.Set("Content-Type", contentType)
+					h.Set("X-Cache", "HIT")
+					w.WriteHeader(http.StatusOK)
+					_, _ = w.Write(body)
+					return
+				}
+			case !errors.Is(err, redis.Nil):
+				logCacheErr(ctx, "read entry", err)
+				next.ServeHTTP(w, r)
 				return
 			}
 
 			w.Header().Set("X-Cache", "MISS")
 			rec := &bodyRecorder{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(rec, r)
-			if rec.status == http.StatusOK && !rec.tooBig {
-				c.store(key, gen, cachedResponse{
-					body:        rec.buf.Bytes(),
-					contentType: w.Header().Get("Content-Type"),
-					expires:     time.Now().Add(c.ttl),
-				})
+			if rec.status != http.StatusOK || rec.tooBig {
+				return
+			}
+			entry := encodeEntry(w.Header().Get("Content-Type"), rec.buf.Bytes())
+			if err := c.rdb.Set(ctx, key, entry, c.ttl).Err(); err != nil {
+				logCacheErr(ctx, "store entry", err)
 			}
 		})
 	}
@@ -105,42 +123,66 @@ func (c *ResponseCache) InvalidateOnWrite(skip ...string) Middleware {
 			}
 			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(rec, r)
-			if rec.status < http.StatusBadRequest {
-				c.Flush()
+			if rec.status >= http.StatusBadRequest {
+				return
+			}
+			// Data sudah berubah, jadi cache tetap dikosongkan walaupun client
+			// sudah memutus koneksi.
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), flushTimeout)
+			defer cancel()
+			if err := c.Flush(ctx); err != nil {
+				slog.ErrorContext(ctx, "response cache: flush failed, public data may be stale until ttl",
+					"path", r.URL.Path, "err", err)
 			}
 		})
 	}
 }
 
-// Flush mengosongkan seluruh cache.
-func (c *ResponseCache) Flush() {
-	c.mu.Lock()
-	c.entries = map[string]cachedResponse{}
-	c.gen++
-	c.mu.Unlock()
+// Flush mengosongkan seluruh cache dengan menaikkan generasi.
+func (c *ResponseCache) Flush(ctx context.Context) error {
+	if err := c.rdb.Incr(ctx, c.genKey()).Err(); err != nil {
+		return fmt.Errorf("response cache: flush: %w", err)
+	}
+	return nil
 }
 
-// store menyimpan entri bila cache belum dikosongkan sejak response mulai
-// dibuat. Bila penuh, entri kedaluwarsa dibuang dulu; bila masih penuh,
-// entri baru tidak disimpan (request tetap dilayani normal).
-func (c *ResponseCache) store(key string, gen uint64, e cachedResponse) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.gen != gen {
+func (c *ResponseCache) genKey() string { return c.prefix + "gen" }
+
+func (c *ResponseCache) entryKey(gen, uri string) string { return c.prefix + gen + ":" + uri }
+
+// generation mengembalikan generasi cache saat ini ("0" bila belum pernah
+// dikosongkan).
+func (c *ResponseCache) generation(ctx context.Context) (string, error) {
+	gen, err := c.rdb.Get(ctx, c.genKey()).Result()
+	if errors.Is(err, redis.Nil) {
+		return "0", nil
+	}
+	return gen, err
+}
+
+// encodeEntry menyimpan Content-Type dan body dalam satu value:
+// "<content-type>\n<body>". Content-Type tidak pernah berisi baris baru.
+func encodeEntry(contentType string, body []byte) []byte {
+	out := make([]byte, 0, len(contentType)+1+len(body))
+	out = append(out, contentType...)
+	out = append(out, '\n')
+	return append(out, body...)
+}
+
+func decodeEntry(raw []byte) (contentType string, body []byte, ok bool) {
+	i := bytes.IndexByte(raw, '\n')
+	if i < 0 {
+		return "", nil, false
+	}
+	return string(raw[:i]), raw[i+1:], true
+}
+
+// logCacheErr mencatat error Redis, kecuali karena request dibatalkan client.
+func logCacheErr(ctx context.Context, op string, err error) {
+	if ctx.Err() != nil {
 		return
 	}
-	if len(c.entries) >= c.maxEntries {
-		now := time.Now()
-		for k, v := range c.entries {
-			if now.After(v.expires) {
-				delete(c.entries, k)
-			}
-		}
-		if len(c.entries) >= c.maxEntries {
-			return
-		}
-	}
-	c.entries[key] = e
+	slog.WarnContext(ctx, "response cache: "+op, "err", err)
 }
 
 // bodyRecorder meneruskan response ke client sambil menyalin body-nya.

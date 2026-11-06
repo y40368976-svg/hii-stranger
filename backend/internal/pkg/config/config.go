@@ -60,6 +60,11 @@ type Config struct {
 	RajaOngkirBaseURL  string
 	RajaOngkirOriginID int
 	RajaOngkirCouriers string
+
+	// Redis untuk cache dan penyimpanan data sementara.
+	RedisAddr     string
+	RedisPassword string
+	RedisDB       int
 }
 
 // Load membaca dan memvalidasi konfigurasi. Semua masalah dilaporkan sekaligus
@@ -110,6 +115,10 @@ func Load() (Config, error) {
 		RajaOngkirBaseURL:  strings.TrimRight(l.str("RAJAONGKIR_BASE_URL", "https://rajaongkir.komerce.id/api/v1"), "/"),
 		RajaOngkirOriginID: int(l.integer("RAJAONGKIR_ORIGIN_ID", 0, 32)),
 		RajaOngkirCouriers: l.str("RAJAONGKIR_COURIERS", "pos"),
+
+		RedisAddr:     l.str("REDIS_ADDR", "localhost:6379"),
+		RedisPassword: l.str("REDIS_PASSWORD", ""),
+		RedisDB:       int(l.integer("REDIS_DB", 0, 32)),
 	}
 
 	if port, err := strconv.Atoi(cfg.Port); err != nil || port < 1 || port > 65535 {
@@ -136,6 +145,10 @@ func Load() (Config, error) {
 	}
 	if port, err := strconv.Atoi(cfg.SMTPPort); err != nil || port < 1 || port > 65535 {
 		l.fail("SMTP_PORT must be a number between 1 and 65535")
+	}
+
+	if cfg.RedisDB < 0 || cfg.RedisDB > 15 {
+		l.fail("REDIS_DB must be between 0 and 15")
 	}
 
 	if err := errors.Join(l.errs...); err != nil {

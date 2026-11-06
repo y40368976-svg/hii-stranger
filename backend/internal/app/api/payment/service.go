@@ -55,10 +55,16 @@ func (s *Service) UploadProof(ctx context.Context, orderID, userID string, proof
 	}
 
 	if c, err := s.repo.contactOf(ctx, orderID); err == nil {
-		s.mail.NotifyOwner("Bukti pembayaran baru: "+c.OrderNumber,
-			fmt.Sprintf("Pelanggan %s mengunggah bukti pembayaran untuk order %s.\n"+
-				"Nominal yang harus diterima: Rp %s (kode unik %d).\n\n"+
-				"Silakan verifikasi di halaman admin.", c.Name, c.OrderNumber, p.Amount, p.UniqueCode))
+		s.mail.NotifyOwnerEmail("Bukti pembayaran baru: "+c.OrderNumber, mailer.Email{
+			Heading:    "Bukti pembayaran perlu diverifikasi",
+			Paragraphs: []string{c.Name + " mengunggah bukti pembayaran QRIS. Cocokkan nominal di mutasi QRIS sebelum menyetujui."},
+			Details: [][2]string{
+				{"No. order", c.OrderNumber},
+				{"Nominal harus diterima", "Rp " + p.Amount},
+				{"Kode unik", fmt.Sprintf("%03d", p.UniqueCode)},
+			},
+			Button: &mailer.Link{Label: "Buka antrean verifikasi", URL: s.mail.AppURL("/admin?tab=payments")},
+		})
 	} else {
 		slog.WarnContext(ctx, "payment: load contact for email failed", "error", err)
 	}
@@ -74,7 +80,7 @@ func (s *Service) Proof(ctx context.Context, orderID, userID string, admin bool)
 }
 
 // List mengambil satu halaman pembayaran (admin).
-func (s *Service) List(ctx context.Context, f Filter, limit, offset int) ([]Payment, int, error) {
+func (s *Service) List(ctx context.Context, f Filter, limit, offset int) ([]AdminItem, int, error) {
 	return s.repo.List(ctx, f, limit, offset)
 }
 
@@ -87,14 +93,30 @@ func (s *Service) Review(ctx context.Context, paymentID, adminID, status string)
 	}
 
 	if c, err := s.repo.contactOf(ctx, p.OrderID); err == nil {
-		subject, body := "Pembayaran diterima: "+c.OrderNumber,
-			fmt.Sprintf("Halo %s,\n\nPembayaran untuk order %s sudah kami terima dan pesanan segera diproses.\n\nTerima kasih!", c.Name, c.OrderNumber)
-		if status == StatusRejected {
-			subject = "Pembayaran ditolak: " + c.OrderNumber
-			body = fmt.Sprintf("Halo %s,\n\nBukti pembayaran untuk order %s belum dapat kami verifikasi.\n"+
-				"Silakan unggah ulang bukti transfer yang sesuai.\n\nTerima kasih.", c.Name, c.OrderNumber)
+		orderURL := s.mail.AppURL("/orders/" + p.OrderID)
+		e := mailer.Email{
+			Heading: "Pembayaran diterima",
+			Paragraphs: []string{
+				"Halo " + c.Name + ", pembayaran untuk pesanan " + c.OrderNumber + " sudah kami verifikasi.",
+				"Pesanan masuk antrean pengemasan. Nomor resi akan dikirim lewat email begitu paket diserahkan ke kurir.",
+			},
+			Details: [][2]string{{"No. order", c.OrderNumber}, {"Nominal", "Rp " + p.Amount}},
+			Button:  &mailer.Link{Label: "Lihat pesanan", URL: orderURL},
 		}
-		s.mail.Notify(c.Email, subject, body)
+		subject := "Pembayaran diterima: " + c.OrderNumber
+		if status == StatusRejected {
+			subject = "Bukti pembayaran ditolak: " + c.OrderNumber
+			e = mailer.Email{
+				Heading: "Bukti pembayaran belum valid",
+				Paragraphs: []string{
+					"Halo " + c.Name + ", bukti pembayaran untuk pesanan " + c.OrderNumber + " belum dapat kami cocokkan dengan mutasi QRIS.",
+					"Pastikan nominal yang dibayar sama persis (termasuk 3 digit kode unik), lalu unggah ulang bukti yang jelas sebelum batas waktu pembayaran.",
+				},
+				Details: [][2]string{{"No. order", c.OrderNumber}, {"Nominal yang benar", "Rp " + p.Amount}},
+				Button:  &mailer.Link{Label: "Unggah ulang bukti", URL: orderURL},
+			}
+		}
+		s.mail.NotifyEmail(c.Email, subject, e)
 	} else {
 		slog.WarnContext(ctx, "payment: load contact for email failed", "error", err)
 	}

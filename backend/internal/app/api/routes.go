@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"hii-stranger1/backend/internal/app/api/auth"
 	"hii-stranger1/backend/internal/app/api/banner"
 	"hii-stranger1/backend/internal/app/api/cart"
@@ -12,6 +14,7 @@ import (
 	"hii-stranger1/backend/internal/app/api/ongkir"
 	"hii-stranger1/backend/internal/app/api/order"
 	"hii-stranger1/backend/internal/app/api/payment"
+	"hii-stranger1/backend/internal/app/api/post"
 	"hii-stranger1/backend/internal/app/api/product"
 	"hii-stranger1/backend/internal/app/api/shipment"
 	"hii-stranger1/backend/internal/app/api/sitesetting"
@@ -20,6 +23,8 @@ import (
 	"hii-stranger1/backend/internal/pkg/config"
 	"hii-stranger1/backend/internal/pkg/response"
 	"hii-stranger1/backend/internal/pkg/token"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -34,11 +39,11 @@ const (
 	publicRateLimit  = 120
 	publicRateWindow = time.Minute
 
-	// Microcache untuk GET publik (produk, kategori, banner, pengaturan situs).
-	// Dikosongkan otomatis setiap ada perubahan data lewat API, jadi ttl hanya
-	// batas aman bila data diubah di luar API atau ada lebih dari satu instance.
-	publicCacheTTL     = 30 * time.Second
-	publicCacheEntries = 5000
+	// Microcache di Redis untuk GET publik (produk, kategori, banner,
+	// pengaturan situs). Dikosongkan otomatis untuk semua instance setiap ada
+	// perubahan data lewat API, jadi ttl hanya batas aman bila data diubah di
+	// luar API.
+	publicCacheTTL = 30 * time.Second
 )
 
 type handlers struct {
@@ -55,15 +60,21 @@ type handlers struct {
 	payment     *payment.Handler
 	shipment    *shipment.Handler
 	upload      *upload.Handler
+	post        *post.Handler
 }
 
 // newRouter menyusun seluruh route dan middleware global. Route baru
 // didaftarkan di sini; rute yang butuh login dibungkus authenticate.
-func newRouter(cfg config.Config, tokens *token.Manager, h handlers) http.Handler {
+func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.Client) http.Handler {
 	authenticate := middleware.Authenticate(tokens)
 	requireAdmin := middleware.RequireRole(user.RoleAdmin)
+	// Belanja (keranjang, checkout, pembayaran) hanya untuk akun pelanggan;
+	// admin dan copywriter ditolak di server, bukan hanya disembunyikan di UI.
+	requireCustomer := middleware.RequireRole(user.RoleCustomer)
+	// Pengelola konten jurnal.
+	requireEditor := middleware.RequireRole(user.RoleAdmin, user.RoleCopywriter)
 	optionalAuthenticate := middleware.AuthenticateOptional(tokens)
-	cache := middleware.NewResponseCache(publicCacheTTL, publicCacheEntries)
+	cache := middleware.NewResponseCache(rdb, publicCacheTTL)
 	cached := cache.Cached()
 
 	mux := http.NewServeMux()
@@ -73,6 +84,12 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers) http.Handle
 		middleware.Chain(http.HandlerFunc(h.auth.Register), middleware.RateLimit(authRateLimit, authRateWindow)))
 	mux.Handle("POST "+apiPrefix+"/auth/login",
 		middleware.Chain(http.HandlerFunc(h.auth.Login), middleware.RateLimit(authRateLimit, authRateWindow)))
+
+	mux.Handle("POST "+apiPrefix+"/auth/verify-email",
+		middleware.Chain(http.HandlerFunc(h.auth.VerifyEmail), middleware.RateLimit(authRateLimit, authRateWindow)))
+	mux.Handle("POST "+apiPrefix+"/auth/verification/resend",
+		middleware.Chain(http.HandlerFunc(h.auth.ResendVerification), authenticate,
+			middleware.RateLimit(authRateLimit, authRateWindow)))
 
 	mux.Handle("GET "+apiPrefix+"/users/me",
 		middleware.Chain(http.HandlerFunc(h.user.Me), authenticate))
@@ -108,15 +125,15 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers) http.Handle
 
 	// Keranjang selalu milik user yang sedang login (lihat token).
 	mux.Handle("GET "+apiPrefix+"/cart",
-		middleware.Chain(http.HandlerFunc(h.cart.Get), authenticate))
+		middleware.Chain(http.HandlerFunc(h.cart.Get), authenticate, requireCustomer))
 	mux.Handle("DELETE "+apiPrefix+"/cart",
-		middleware.Chain(http.HandlerFunc(h.cart.Clear), authenticate))
+		middleware.Chain(http.HandlerFunc(h.cart.Clear), authenticate, requireCustomer))
 	mux.Handle("POST "+apiPrefix+"/cart/items",
-		middleware.Chain(http.HandlerFunc(h.cart.Create), authenticate))
+		middleware.Chain(http.HandlerFunc(h.cart.Create), authenticate, requireCustomer))
 	mux.Handle("PATCH "+apiPrefix+"/cart/items/{cartItemId}",
-		middleware.Chain(http.HandlerFunc(h.cart.Update), authenticate))
+		middleware.Chain(http.HandlerFunc(h.cart.Update), authenticate, requireCustomer))
 	mux.Handle("DELETE "+apiPrefix+"/cart/items/{cartItemId}",
-		middleware.Chain(http.HandlerFunc(h.cart.Delete), authenticate))
+		middleware.Chain(http.HandlerFunc(h.cart.Delete), authenticate, requireCustomer))
 
 	mux.Handle("GET "+apiPrefix+"/admin/users",
 		middleware.Chain(http.HandlerFunc(h.user.AdminList), authenticate, requireAdmin))
@@ -141,7 +158,7 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers) http.Handle
 
 	// Unggah gambar ke Cloudinary; URL hasilnya dipakai untuk image_url (admin).
 	mux.Handle("POST "+apiPrefix+"/admin/uploads/images",
-		middleware.Chain(http.HandlerFunc(h.upload.Image), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.upload.Image), authenticate, requireEditor))
 
 	// Banner: publik, admin dikenali lewat token opsional (include_inactive).
 	mux.Handle("GET "+apiPrefix+"/banners",
@@ -173,16 +190,22 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers) http.Handle
 	mux.Handle("GET "+apiPrefix+"/regions/districts/{districtId}/subdistricts",
 		middleware.Chain(http.HandlerFunc(h.ongkir.SubDistricts), regionLimit))
 	mux.Handle("GET "+apiPrefix+"/shipping/costs",
-		middleware.Chain(http.HandlerFunc(h.ongkir.Costs), authenticate,
+		middleware.Chain(http.HandlerFunc(h.ongkir.Costs), authenticate, requireCustomer,
 			middleware.RateLimit(publicRateLimit, publicRateWindow)))
 
 	// Order: user melihat ordernya sendiri; admin lewat /admin/orders.
 	mux.Handle("GET "+apiPrefix+"/orders",
 		middleware.Chain(http.HandlerFunc(h.order.ListMine), authenticate))
 	mux.Handle("POST "+apiPrefix+"/orders",
-		middleware.Chain(http.HandlerFunc(h.order.Create), authenticate))
+		middleware.Chain(http.HandlerFunc(h.order.Create), authenticate, requireCustomer))
+	mux.Handle("POST "+apiPrefix+"/orders/{orderId}/cancel",
+		middleware.Chain(http.HandlerFunc(h.order.Cancel), authenticate, requireCustomer))
+	mux.Handle("POST "+apiPrefix+"/orders/{orderId}/complete",
+		middleware.Chain(http.HandlerFunc(h.order.Complete), authenticate, requireCustomer))
 	mux.Handle("GET "+apiPrefix+"/orders/{orderId}",
 		middleware.Chain(http.HandlerFunc(h.order.Get), authenticate))
+	mux.Handle("GET "+apiPrefix+"/admin/summary",
+		middleware.Chain(http.HandlerFunc(h.order.AdminSummary), authenticate, requireAdmin))
 	mux.Handle("GET "+apiPrefix+"/admin/orders",
 		middleware.Chain(http.HandlerFunc(h.order.AdminList), authenticate, requireAdmin))
 	mux.Handle("PUT "+apiPrefix+"/admin/orders/{orderId}/status",
@@ -192,11 +215,11 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers) http.Handle
 	mux.Handle("GET "+apiPrefix+"/orders/{orderId}/payment",
 		middleware.Chain(http.HandlerFunc(h.payment.Get), authenticate))
 	mux.Handle("POST "+apiPrefix+"/orders/{orderId}/payment",
-		middleware.Chain(http.HandlerFunc(h.payment.Create), authenticate))
+		middleware.Chain(http.HandlerFunc(h.payment.Create), authenticate, requireCustomer))
 	mux.Handle("GET "+apiPrefix+"/orders/{orderId}/payment/proof",
 		middleware.Chain(http.HandlerFunc(h.payment.GetProof), authenticate))
 	mux.Handle("PUT "+apiPrefix+"/orders/{orderId}/payment/proof",
-		middleware.Chain(http.HandlerFunc(h.payment.UploadProof), authenticate))
+		middleware.Chain(http.HandlerFunc(h.payment.UploadProof), authenticate, requireCustomer))
 	mux.Handle("GET "+apiPrefix+"/admin/payments",
 		middleware.Chain(http.HandlerFunc(h.payment.AdminList), authenticate, requireAdmin))
 	mux.Handle("POST "+apiPrefix+"/admin/payments/{paymentId}/review",
@@ -208,10 +231,27 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers) http.Handle
 	mux.Handle("PUT "+apiPrefix+"/orders/{orderId}/shipment",
 		middleware.Chain(http.HandlerFunc(h.shipment.Upsert), authenticate, requireAdmin))
 
+	// Jurnal: publik membaca artikel terbit (di-cache); admin & copywriter
+	// mengelola semua artikel.
+	mux.Handle("GET "+apiPrefix+"/posts",
+		middleware.Chain(http.HandlerFunc(h.post.PublicList), cached))
+	mux.Handle("GET "+apiPrefix+"/posts/{slug}",
+		middleware.Chain(http.HandlerFunc(h.post.PublicGet), cached))
+	mux.Handle("GET "+apiPrefix+"/admin/posts",
+		middleware.Chain(http.HandlerFunc(h.post.AdminList), authenticate, requireEditor))
+	mux.Handle("POST "+apiPrefix+"/admin/posts",
+		middleware.Chain(http.HandlerFunc(h.post.Create), authenticate, requireEditor))
+	mux.Handle("GET "+apiPrefix+"/admin/posts/{postId}",
+		middleware.Chain(http.HandlerFunc(h.post.AdminGet), authenticate, requireEditor))
+	mux.Handle("PATCH "+apiPrefix+"/admin/posts/{postId}",
+		middleware.Chain(http.HandlerFunc(h.post.Update), authenticate, requireEditor))
+	mux.Handle("DELETE "+apiPrefix+"/admin/posts/{postId}",
+		middleware.Chain(http.HandlerFunc(h.post.Delete), authenticate, requireEditor))
+
 	// Semua yang tidak cocok dijawab dengan format error yang sama.
 	mux.HandleFunc("/", notFound)
 
-	return middleware.Chain(mux,
+	api := middleware.Chain(mux,
 		middleware.Recover(),
 		middleware.Logger(),
 		middleware.CORS(cfg.FrontendURL),
@@ -220,7 +260,16 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers) http.Handle
 		cache.InvalidateOnWrite(apiPrefix+"/auth/", apiPrefix+"/users/me", apiPrefix+"/cart"),
 		middleware.MaxBody(cfg.MaxBodyBytes),
 		middleware.Timeout(cfg.HTTPRequestTimeout),
+		// Paling dalam supaya pola rute dari mux (r.Pattern) terbaca sebagai label.
+		middleware.Metrics(),
 	)
+
+	// /metrics dibaca Prometheus dan sengaja di luar middleware API (tidak
+	// dicatat di log, tidak kena timeout, tidak ikut dihitung sebagai request API).
+	root := http.NewServeMux()
+	root.Handle("GET /metrics", promhttp.Handler())
+	root.Handle("/", api)
+	return root
 }
 
 func health(w http.ResponseWriter, _ *http.Request) {

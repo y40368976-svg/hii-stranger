@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	userColumns     = `id, name, email, password_hash, phone, role, status, email_verified_at`
+	userColumns     = `id, name, email, password_hash, phone, role, status, email_verified_at, created_at`
 	uniqueViolation = "23505"
 	emailConstraint = "uq_users_email"
 )
@@ -111,7 +112,7 @@ func (r *Repository) List(ctx context.Context, f ListFilter) ([]User, int, error
 
 	args = append(args, f.Limit, f.Offset)
 	rows, err := r.db.Query(ctx,
-		fmt.Sprintf(`SELECT %s FROM users%s ORDER BY name, id LIMIT $%d OFFSET $%d`,
+		fmt.Sprintf(`SELECT %s FROM users%s ORDER BY created_at DESC, id LIMIT $%d OFFSET $%d`,
 			userColumns, where, len(args)-1, len(args)),
 		args...)
 	if err != nil {
@@ -151,6 +152,65 @@ func (r *Repository) AdminUpdate(ctx context.Context, id string, c AdminChanges)
 
 // where menyusun klausa WHERE dari filter. Hanya potongan SQL konstan yang
 // disambung; seluruh nilai dari client dikirim sebagai parameter.
+// SaveVerification menyimpan hash token verifikasi email baru untuk user dan
+// menghapus token lamanya, sehingga hanya tautan terbaru yang berlaku.
+func (r *Repository) SaveVerification(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return wrap("save verification begin", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `DELETE FROM email_verifications WHERE user_id = $1`, userID); err != nil {
+		return wrap("save verification clear", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO email_verifications (token_hash, user_id, expires_at) VALUES ($1, $2, $3)`,
+		tokenHash, userID, expiresAt); err != nil {
+		return wrap("save verification insert", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return wrap("save verification commit", err)
+	}
+	return nil
+}
+
+// ConsumeVerification menandai email user terverifikasi bila token masih
+// berlaku, lalu menghapus token tersebut (sekali pakai).
+func (r *Repository) ConsumeVerification(ctx context.Context, tokenHash string) (User, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return User{}, wrap("consume verification begin", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var userID string
+	err = tx.QueryRow(ctx,
+		`DELETE FROM email_verifications
+		  WHERE token_hash = $1 AND expires_at > now()
+		  RETURNING user_id`, tokenHash).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrInvalidVerification
+	}
+	if err != nil {
+		return User{}, wrap("consume verification", err)
+	}
+	u, err := scanUser(tx.QueryRow(ctx,
+		`UPDATE users SET email_verified_at = COALESCE(email_verified_at, now())
+		  WHERE id = $1
+		  RETURNING `+userColumns, userID))
+	if err != nil {
+		return User{}, wrap("consume verification update", err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM email_verifications WHERE user_id = $1`, userID); err != nil {
+		return User{}, wrap("consume verification cleanup", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return User{}, wrap("consume verification commit", err)
+	}
+	return u, nil
+}
+
 func (f ListFilter) where() (string, []any) {
 	var conds []string
 	var args []any
@@ -183,7 +243,7 @@ func escapeLike(s string) string {
 
 func scanUser(row pgx.Row) (User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Name, &u.Email, &u.PasswordHash, &u.Phone, &u.Role, &u.Status, &u.EmailVerifiedAt)
+	err := row.Scan(&u.ID, &u.Name, &u.Email, &u.PasswordHash, &u.Phone, &u.Role, &u.Status, &u.EmailVerifiedAt, &u.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
@@ -196,7 +256,7 @@ func scanUser(row pgx.Row) (User, error) {
 // wrap menambahkan konteks operasi, tetapi membiarkan error domain tetap utuh
 // agar pemanggil bisa memeriksanya dengan errors.Is.
 func wrap(op string, err error) error {
-	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrEmailTaken) {
+	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrEmailTaken) || errors.Is(err, ErrInvalidVerification) {
 		return err
 	}
 	return fmt.Errorf("user: %s: %w", op, err)

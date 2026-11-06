@@ -12,6 +12,7 @@ import (
 	"hii-stranger1/backend/internal/app/api"
 	"hii-stranger1/backend/internal/pkg/config"
 	"hii-stranger1/backend/internal/pkg/database"
+	redisclient "hii-stranger1/backend/internal/pkg/redis"
 )
 
 const (
@@ -47,6 +48,16 @@ func run() error {
 	}
 	defer pool.Close()
 
+	redisClient, err := redisclient.New(
+		ctx,
+		cfg.RedisAddr,
+		cfg.RedisPassword,
+		cfg.RedisDB,
+	)
+	if err != nil {
+		return fmt.Errorf("initialize redis: %w", err)
+	}
+	defer redisClient.Close()
 	slog.Info(
 		"server starting",
 		"app", MyAppName,
@@ -55,7 +66,7 @@ func run() error {
 		"env", cfg.AppEnv,
 	)
 
-	if err := api.New(cfg, pool).Run(ctx); err != nil {
+	if err := api.New(cfg, pool, redisClient).Run(ctx); err != nil {
 		return fmt.Errorf("run server: %w", err)
 	}
 
