@@ -53,7 +53,7 @@ export function DateTimePicker({ value, onChange, placeholder = "Pilih tanggal &
     const d = selected ?? new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
   });
-  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number; maxHeight: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const mobile = useIsMobile();
@@ -68,8 +68,14 @@ export function DateTimePicker({ value, onChange, placeholder = "Pilih tanggal &
     if (!r) return;
     const width = 320;
     const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
-    const below = window.innerHeight - r.bottom;
-    setPos(below < 470 && r.top > below ? { left, bottom: window.innerHeight - r.top + 6 } : { left, top: r.bottom + 6 });
+    const below = window.innerHeight - r.bottom - 14;
+    const above = r.top - 14;
+    // Pilih sisi yang lebih lega & batasi tinggi supaya panel tidak terpotong layar.
+    setPos(
+      below < 560 && above > below
+        ? { left, bottom: window.innerHeight - r.top + 6, maxHeight: above }
+        : { left, top: r.bottom + 6, maxHeight: below }
+    );
   }, []);
 
   useEffect(() => {
@@ -127,12 +133,6 @@ export function DateTimePicker({ value, onChange, placeholder = "Pilih tanggal &
   };
   const invalidDraft = !!(draft && minDate && draft <= minDate);
 
-  const hourRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const h = draft?.getHours() ?? defaultHour;
-    hourRef.current?.querySelector<HTMLElement>(`[data-h="${h}"]`)?.scrollIntoView({ block: "nearest", inline: "center" });
-  }, [open, draft, defaultHour]);
 
   const body = (
     <div className="w-full sm:w-[320px]">
@@ -142,6 +142,7 @@ export function DateTimePicker({ value, onChange, placeholder = "Pilih tanggal &
           { label: "Besok 00.00", fn: () => { const d = startOfDay(new Date()); d.setDate(d.getDate() + 1); return d; } },
           { label: "+3 hari", fn: () => { const d = new Date(draft ?? new Date()); d.setDate(d.getDate() + 3); return d; } },
           { label: "+7 hari", fn: () => { const d = new Date(draft ?? new Date()); d.setDate(d.getDate() + 7); return d; } },
+          { label: "Akhir hari", fn: () => { const d = new Date(draft ?? new Date()); d.setHours(23, 59, 0, 0); return d; } },
         ].map((q) => (
           <button key={q.label} type="button" onClick={() => quick(q.fn)} className="h-8 shrink-0 rounded-full border border-line bg-stone px-3 text-xs font-semibold hover:border-ink">
             {q.label}
@@ -198,15 +199,15 @@ export function DateTimePicker({ value, onChange, placeholder = "Pilih tanggal &
         <p className="caps mb-2 flex items-center gap-1.5 text-muted">
           <Clock className="size-3.5" /> Jam
         </p>
-        <div ref={hourRef} className="no-scrollbar flex gap-1 overflow-x-auto pb-1">
+        <div className="grid grid-cols-6 gap-1" role="group" aria-label="Pilih jam">
           {Array.from({ length: 24 }, (_, h) => (
             <button
               key={h}
-              data-h={h}
               type="button"
+              aria-pressed={draft?.getHours() === h}
               onClick={() => setTime(h, draft?.getMinutes() ?? 0)}
               className={cn(
-                "h-9 min-w-11 shrink-0 rounded-lg border text-sm font-semibold tabular",
+                "h-9 rounded-lg border text-sm font-semibold tabular transition-colors",
                 draft?.getHours() === h ? "border-ink bg-ink text-lime" : "border-line bg-white hover:border-ink"
               )}
             >
@@ -214,14 +215,16 @@ export function DateTimePicker({ value, onChange, placeholder = "Pilih tanggal &
             </button>
           ))}
         </div>
-        <div className="mt-2 grid grid-cols-5 gap-1">
-          {[...MINUTES, 59].map((m) => (
+        <p className="caps mb-2 mt-3 text-muted">Menit</p>
+        <div className="grid grid-cols-4 gap-1" role="group" aria-label="Pilih menit">
+          {(draft && !MINUTES.includes(draft.getMinutes()) ? [...MINUTES, draft.getMinutes()].sort((a, b) => a - b) : MINUTES).map((m) => (
             <button
               key={m}
               type="button"
               onClick={() => setTime(draft?.getHours() ?? defaultHour, m)}
+              aria-pressed={draft?.getMinutes() === m}
               className={cn(
-                "h-9 rounded-lg border text-sm font-semibold tabular",
+                "h-9 rounded-lg border text-sm font-semibold tabular transition-colors",
                 draft?.getMinutes() === m ? "border-ink bg-ink text-lime" : "border-line bg-white hover:border-ink"
               )}
             >
@@ -298,8 +301,8 @@ export function DateTimePicker({ value, onChange, placeholder = "Pilih tanggal &
             ref={panelRef}
             role="dialog"
             aria-label={title ?? placeholder}
-            style={{ position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom }}
-            className="z-[120] overflow-hidden rounded-2xl border border-line bg-white shadow-pop animate-pop-in"
+            style={{ position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight }}
+            className="z-[120] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-white shadow-pop animate-pop-in"
           >
             {body}
           </div>,

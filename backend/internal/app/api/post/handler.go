@@ -25,7 +25,7 @@ type errInvalid struct{ fields []response.FieldError }
 
 func (e errInvalid) Error() string { return "post: invalid input" }
 
-// Handler melayani /posts (publik) dan /admin/posts (admin & copywriter).
+// Handler melayani /posts (publik) dan /admin/posts (admin & staff).
 type Handler struct {
 	svc *Service
 }

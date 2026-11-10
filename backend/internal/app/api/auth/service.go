@@ -1,4 +1,4 @@
-// Package auth menangani registrasi, login, dan verifikasi email.
+// Package auth menangani registrasi, login, verifikasi email, dan lupa password.
 package auth
 
 import (
@@ -24,6 +24,10 @@ var ErrInvalidCredentials = errors.New("auth: invalid credentials")
 
 // ErrAlreadyVerified: email user sudah terverifikasi, tidak perlu kirim ulang.
 var ErrAlreadyVerified = errors.New("auth: email already verified")
+
+// passwordResetTTL adalah masa berlaku tautan reset password. Dibuat
+// pendek karena tautan ini setara dengan akses ke akun.
+const passwordResetTTL = time.Hour
 
 // verificationTTL adalah masa berlaku tautan verifikasi email.
 const verificationTTL = 24 * time.Hour
@@ -171,4 +175,52 @@ func newToken() (string, error) {
 func hashToken(raw string) string {
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])
+}
+
+// RequestPasswordReset mengirim tautan reset ke email bila akun aktif.
+// Email yang tidak terdaftar/nonaktif sengaja tidak dibedakan (selalu sukses)
+// supaya endpoint tidak bisa dipakai menebak email yang terdaftar.
+func (s *Service) RequestPasswordReset(ctx context.Context, email string) error {
+	u, err := s.users.GetByEmail(ctx, email)
+	if errors.Is(err, user.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if u.Status != user.StatusActive {
+		return nil
+	}
+	raw, err := newToken()
+	if err != nil {
+		return err
+	}
+	if err := s.users.SavePasswordReset(ctx, u.ID, hashToken(raw), time.Now().Add(passwordResetTTL)); err != nil {
+		return err
+	}
+	link := s.mail.AppURL("/reset-password?token=" + url.QueryEscape(raw))
+	if !s.mail.Enabled() {
+		slog.WarnContext(ctx, "SMTP mati: tautan reset password", "email", u.Email, "link", link)
+		return nil
+	}
+	s.mail.NotifyEmail(u.Email, "Atur ulang password akun Hii Stranger", mailer.Email{
+		Heading: "Atur ulang password",
+		Paragraphs: []string{
+			"Halo " + u.Name + ", kami menerima permintaan untuk mengatur ulang password akun Hii Stranger kamu.",
+			"Klik tombol di bawah untuk membuat password baru.",
+		},
+		Button: &mailer.Link{Label: "Buat password baru", URL: link},
+		Note:   "Tautan berlaku 1 jam dan hanya bisa dipakai sekali. Abaikan email ini bila kamu tidak meminta reset password; password lama tetap berlaku.",
+	})
+	return nil
+}
+
+// ResetPassword mengganti password memakai token dari tautan email.
+func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword string) error {
+	hash, err := password.Hash(newPassword)
+	if err != nil {
+		return fmt.Errorf("auth: hash password: %w", err)
+	}
+	_, err = s.users.ConsumePasswordReset(ctx, hashToken(rawToken), hash)
+	return err
 }

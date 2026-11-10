@@ -339,7 +339,7 @@ func principal(r *http.Request) (userID string, admin bool) {
 	if !ok {
 		return "", false
 	}
-	return p.UserID, p.Role == user.RoleAdmin
+	return p.UserID, user.IsBackoffice(p.Role)
 }
 
 // isOngkirError melaporkan apakah err berasal dari perhitungan ongkir.

@@ -20,7 +20,7 @@ func TestRequireRole(t *testing.T) {
 		{"no principal", nil, http.StatusUnauthorized, false},
 		{"wrong role", &Principal{UserID: "u1", Role: "customer"}, http.StatusForbidden, false},
 		{"right role", &Principal{UserID: "u1", Role: "admin"}, http.StatusOK, true},
-		{"second allowed role", &Principal{UserID: "u2", Role: "copywriter"}, http.StatusOK, true},
+		{"second allowed role", &Principal{UserID: "u2", Role: "staff"}, http.StatusOK, true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -35,7 +35,7 @@ func TestRequireRole(t *testing.T) {
 				req = req.WithContext(context.WithValue(req.Context(), principalKey{}, *tc.principal))
 			}
 			rec := httptest.NewRecorder()
-			RequireRole("admin", "copywriter")(next).ServeHTTP(rec, req)
+			RequireRole("admin", "staff")(next).ServeHTTP(rec, req)
 
 			if rec.Code != tc.wantStatus {
 				t.Errorf("status = %d, want %d", rec.Code, tc.wantStatus)

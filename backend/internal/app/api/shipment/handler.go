@@ -35,7 +35,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s, err := h.svc.Get(r.Context(), orderID, p.UserID, p.Role == user.RoleAdmin)
+	s, err := h.svc.Get(r.Context(), orderID, p.UserID, user.IsBackoffice(p.Role))
 	if h.writeError(w, r, "get", err) {
 		return
 	}

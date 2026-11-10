@@ -107,7 +107,7 @@ export function HeroCarousel({ banners }: { banners: ApiBanner[] }) {
               aria-label={`Banner ${i + 1}`}
               aria-current={i === index}
               onClick={() => go(i)}
-              className={cn("h-1.5 rounded-full transition-all", i === index ? "w-6 bg-ink" : "w-1.5 bg-line-strong")}
+              className={cn("h-1.5 rounded-full transition-[width,background-color]", i === index ? "w-6 bg-ink" : "w-1.5 bg-line-strong")}
             />
           ))}
         </div>

@@ -8,8 +8,7 @@ type AuthState = {
   user: ApiUser | null;
   loading: boolean;
   isAdmin: boolean;
-  isCopywriter: boolean;
-  /** Admin/copywriter: akun staf, tidak boleh berbelanja. */
+  /** Admin atau staff: akun back-office, tidak boleh berbelanja. */
   isStaff: boolean;
   /** Pelanggan yang emailnya sudah terverifikasi (boleh checkout). */
   canOrder: boolean;
@@ -67,13 +66,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<AuthState>(() => {
     const isAdmin = user?.role === "admin";
-    const isCopywriter = user?.role === "copywriter";
     return {
       user,
       loading,
       isAdmin,
-      isCopywriter,
-      isStaff: isAdmin || isCopywriter,
+      isStaff: isAdmin || user?.role === "staff",
       canOrder: user?.role === "customer" && !!user.email_verified_at,
       login,
       register,

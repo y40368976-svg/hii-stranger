@@ -200,7 +200,7 @@ export default function Checkout() {
   if (isStaff)
     return (
       <div className="container-x py-16">
-        <EmptyState title="Checkout khusus pelanggan" description="Akun admin dan copywriter tidak dapat membuat pesanan." action={<LinkButton href="/admin">Ke panel</LinkButton>} />
+        <EmptyState title="Checkout khusus pelanggan" description="Akun admin dan staff tidak dapat membuat pesanan." action={<LinkButton href="/admin">Ke panel</LinkButton>} />
       </div>
     );
 
@@ -214,7 +214,7 @@ export default function Checkout() {
     );
 
   return (
-    <form onSubmit={submit} className="container-x pb-36 pt-8 sm:pb-8 md:py-12" noValidate>
+    <form onSubmit={submit} className="container-x pb-20 pt-8 sm:pb-8 md:py-12" noValidate>
       <p className="caps mb-1 text-muted">Checkout</p>
       <h1 className="font-display text-[34px] font-extrabold uppercase leading-none tracking-tight md:text-5xl">Pengiriman</h1>
 
@@ -359,9 +359,11 @@ export default function Checkout() {
               <span className="font-semibold">Total</span>
               <span className="font-display text-2xl font-bold tabular">{formatRupiah(total)}</span>
             </div>
-            <Button type="submit" variant="primary" size="lg" block className="mt-5" loading={submitting} disabled={!quote || overStock}>
-              <Lock className="size-4" /> Buat pesanan
-            </Button>
+            <div className="mt-5 hidden sm:block">
+              <Button type="submit" variant="primary" size="lg" block loading={submitting} disabled={!quote || overStock}>
+                <Lock className="size-4" /> Buat pesanan
+              </Button>
+            </div>
             {overStock && (
               <p className="mt-2 text-xs font-semibold text-danger">
                 Ada item melebihi stok. <Link href="/cart" className="underline">Ubah di tas</Link>.
@@ -375,7 +377,7 @@ export default function Checkout() {
       </div>
 
       {/* Bar bayar mobile: total selalu terlihat tanpa harus scroll ke ringkasan. */}
-      <div className="glass fixed inset-x-0 bottom-16 z-30 border-t border-line/70 px-4 py-3 sm:hidden">
+      <div className="glass fixed inset-x-0 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 border-t border-line/70 px-4 py-3 sm:hidden">
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">{quote ? "Total" : "Subtotal"}</p>

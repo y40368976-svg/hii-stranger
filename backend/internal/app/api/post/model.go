@@ -1,4 +1,4 @@
-// Package post mengelola artikel jurnal/blog yang ditulis copywriter.
+// Package post mengelola artikel jurnal/blog yang ditulis admin/staff.
 package post
 
 import (

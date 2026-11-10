@@ -218,14 +218,14 @@ Backend **dan** frontend diubah. Backup sebelum perubahan: `Project Kampus/capst
 |---|---|
 | Verifikasi email wajib sebelum pesan | register kirim tautan (token SHA-256, 24 jam, sekali pakai); `POST /auth/verify-email`, `POST /auth/verification/resend`; checkout menolak `403 email_not_verified`. Akun lama ditandai terverifikasi oleh migrasi. Tanpa SMTP, tautan ditulis ke log server. |
 | Admin/copywriter tidak bisa belanja | `RequireRole(customer)` di `/cart*`, `/shipping/costs`, `POST /orders`, bayar & unggah bukti; dicek ulang di transaksi checkout. Storefront menyembunyikan tas untuk staf. |
-| Role copywriter | hanya menu Jurnal + unggah gambar. Admin mengatur role di menu Pengguna. |
+| Role copywriter | hanya menu News + unggah gambar. Admin mengatur role di menu Pengguna. |
 | Pembayaran QRIS saja | tagihan (total + kode unik 3 digit) dibuat otomatis saat checkout; method lain ditolak. |
 | Batas bayar | `payment_due_at` (default 24 jam, bisa diatur); order lewat batas & tanpa bukti yang sedang dicek dibatalkan otomatis tiap 5 menit, stok dikembalikan. |
 | Batal & selesai oleh pelanggan | `POST /orders/{id}/cancel` (selama belum bayar & bukti tidak sedang dicek), `POST /orders/{id}/complete` (setelah dikirim). Admin wajib isi alasan saat membatalkan. |
 | Stok | daftar produk mengembalikan `total_stock` & `variant_count`; produk nonaktif tidak bisa masuk keranjang; storefront memakai request anonim agar admin tidak melihat produk nonaktif di toko. |
 | Email + lacak resi | email HTML+teks; email kirim berisi no. resi, tautan halaman pesanan, situs resmi kurir, dan cekresi.com dengan resi terisi (`internal/pkg/tracking`). |
 | Banner | 3 penempatan: `hero` (1920×800), `main` (1600×1000), `catalog` (1920×480) + gambar mobile, judul/label/CTA, jadwal `starts_at`/`ends_at`, status live/terjadwal/berakhir/nonaktif. |
-| Jurnal | tabel `posts` + `post_products`; publik `GET /posts`, `GET /posts/{slug}`; staf `/admin/posts` CRUD, terbit terjadwal. |
+| News | tabel `posts` + `post_products`; publik `GET /posts`, `GET /posts/{slug}`; staf `/admin/posts` CRUD, terbit terjadwal. |
 | Ringkasan admin | `GET /admin/summary` (antrean bukti, kemas, kirim, omzet bulan ini, stok menipis, order terbaru). |
 
 ### Frontend

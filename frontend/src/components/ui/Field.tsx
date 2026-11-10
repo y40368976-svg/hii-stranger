@@ -100,7 +100,7 @@ export function Switch({
       >
         <span
           className={cn(
-            "absolute top-0.5 size-[18px] rounded-full transition-all",
+            "absolute top-0.5 size-[18px] rounded-full transition-[left,background-color]",
             checked ? "left-[22px] bg-lime" : "left-0.5 bg-white shadow-sm"
           )}
         />

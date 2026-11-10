@@ -10,8 +10,8 @@ import {
   LogIn,
   LogOut,
   Package,
-  PenLine,
   Search,
+  Settings,
   ShoppingBag,
   Store,
   User,
@@ -29,12 +29,12 @@ import { SearchDialog } from "./SearchDialog";
 
 const NAV = [
   { href: "/shop", label: "Katalog" },
-  { href: "/shop?sort=newest", label: "Baru Datang" },
-  { href: "/journal", label: "Jurnal" },
+  { href: "/shop?new=1", label: "Baru Datang" },
+  { href: "/journal", label: "News" },
 ];
 
 export default function Header() {
-  const { user, isStaff, isCopywriter, logout } = useAuth();
+  const { user, isStaff, logout } = useAuth();
   const count = useAppSelector(selectCartCount);
   const { openCartModal } = useCartModalContext();
   const categories = useCategories();
@@ -47,14 +47,22 @@ export default function Header() {
         ...(isStaff
           ? [
               {
-                label: isCopywriter ? "Studio Jurnal" : "Panel Admin",
-                icon: isCopywriter ? <PenLine className="size-4" /> : <LayoutDashboard className="size-4" />,
-                href: isCopywriter ? "/admin?tab=journal" : "/admin",
+                label: "Panel admin",
+                icon: <LayoutDashboard className="size-4" />,
+                href: "/admin",
               },
             ]
           : [
-              { label: "Pesanan saya", icon: <Package className="size-4" />, href: "/my-account" },
-              { label: "Profil & keamanan", icon: <UserRound className="size-4" />, href: "/my-account?tab=profile" },
+              {
+                label: "Pesanan saya",
+                icon: <Package className="size-4" />,
+                href: "/my-account",
+              },
+              {
+                label: "Profil & keamanan",
+                icon: <UserRound className="size-4" />,
+                href: "/my-account?tab=profile",
+              },
             ]),
         "separator" as const,
         {
@@ -72,17 +80,22 @@ export default function Header() {
   return (
     <>
       <header className="glass fixed inset-x-0 top-0 z-40 border-b border-line/70">
-        <div className="container-x flex h-16 items-center gap-4 lg:h-[72px]">
+        <div className="container-x flex h-16 items-center gap-4 lg:height: 72px;">
           <Logo />
 
-          <nav className="ml-6 hidden items-center gap-1 lg:flex" aria-label="Utama">
+          <nav
+            className="ml-6 hidden items-center gap-1 lg:flex"
+            aria-label="Utama"
+          >
             {NAV.map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
                 className={cn(
                   "rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-stone",
-                  pathname === n.href.split("?")[0] && n.href.indexOf("?") < 0 && "bg-stone"
+                  pathname === n.href.split("?")[0] &&
+                    n.href.indexOf("?") < 0 &&
+                    "bg-stone",
                 )}
               >
                 {n.label}
@@ -95,7 +108,10 @@ export default function Header() {
                 items={[
                   { label: "Semua produk", href: "/shop" },
                   "separator",
-                  ...categories.map((c) => ({ label: c.name, href: "/shop?category=" + c.id })),
+                  ...categories.map((c) => ({
+                    label: c.name,
+                    href: "/shop?category=" + c.id,
+                  })),
                 ]}
                 trigger={({ open, toggle, ref }) => (
                   <button
@@ -104,9 +120,18 @@ export default function Header() {
                     onClick={toggle}
                     aria-expanded={open}
                     aria-haspopup="menu"
-                    className={cn("inline-flex items-center gap-1 rounded-full px-4 py-2 text-sm font-semibold hover:bg-stone", open && "bg-stone")}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full px-4 py-2 text-sm font-semibold hover:bg-stone",
+                      open && "bg-stone",
+                    )}
                   >
-                    Kategori <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
+                    Kategori{" "}
+                    <ChevronDown
+                      className={cn(
+                        "size-4 transition-transform",
+                        open && "rotate-180",
+                      )}
+                    />
                   </button>
                 )}
               />
@@ -131,17 +156,39 @@ export default function Header() {
               <Search className="size-5" />
             </button>
 
-            {user ? (
+            {user && !isStaff ? (
+              pathname.startsWith("/my-account") ? (
+                <Link
+                  href="/"
+                  aria-label="Beranda"
+                  title="Beranda"
+                  className="hidden size-11 place-items-center rounded-full hover:bg-stone lg:grid"
+                >
+                  <Home className="size-5" />
+                </Link>
+              ) : (
+                <Link
+                  href="/my-account?tab=profile"
+                  aria-label="Pengaturan akun"
+                  title="Pengaturan akun"
+                  className="hidden size-11 place-items-center rounded-full hover:bg-stone lg:grid"
+                >
+                  <Settings className="size-5" />
+                </Link>
+              )
+            ) : user ? (
               <Menu
                 label="Akun"
                 items={accountItems}
                 header={
                   <div>
-                    <p className="truncate text-sm font-semibold">{user.name}</p>
+                    <p className="truncate text-sm font-semibold">
+                      {user.name}
+                    </p>
                     <p className="truncate text-xs text-muted">{user.email}</p>
                   </div>
                 }
-                className="hidden sm:inline-block"
+                className="hidden lg:inline-block"
                 trigger={({ open, toggle, ref }) => (
                   <button
                     ref={ref}
@@ -152,20 +199,22 @@ export default function Header() {
                     aria-label="Menu akun"
                     className={cn(
                       "inline-flex h-10 items-center gap-2 rounded-full pl-1 pr-3 text-sm font-semibold hover:bg-stone",
-                      open && "bg-stone"
+                      open && "bg-stone",
                     )}
                   >
                     <span className="grid size-8 place-items-center rounded-full bg-ink text-[13px] font-bold uppercase text-lime">
                       {user.name.trim().charAt(0) || "?"}
                     </span>
-                    <span className="hidden max-w-28 truncate lg:inline">{user.name.split(" ")[0]}</span>
+                    <span className="hidden max-w-28 truncate lg:inline">
+                      {user.name.split(" ")[0]}
+                    </span>
                   </button>
                 )}
               />
             ) : (
               <Link
                 href="/signin"
-                className="hidden h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold hover:bg-stone sm:inline-flex"
+                className="hidden h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold hover:bg-stone lg:inline-flex"
               >
                 <User className="size-4" /> Masuk
               </Link>
@@ -173,11 +222,10 @@ export default function Header() {
 
             {isStaff ? (
               <Link
-                href={isCopywriter ? "/admin?tab=journal" : "/admin"}
-                className="caps hidden h-10 items-center gap-2 rounded-full bg-ink px-4 text-lime sm:inline-flex"
+                href="/admin"
+                className="caps hidden h-10 items-center gap-2 rounded-full bg-ink px-4 text-lime lg:inline-flex"
               >
-                {isCopywriter ? <PenLine className="size-3.5" /> : <LayoutDashboard className="size-3.5" />}
-                {isCopywriter ? "Studio" : "Panel"}
+                <LayoutDashboard className="size-3.5" /> Panel
               </Link>
             ) : (
               <button
@@ -203,55 +251,57 @@ export default function Header() {
   );
 }
 
-/** Navigasi bawah untuk satu tangan di mobile. */
+/** Navigasi bawah untuk mobile & tablet (< lg). Di desktop diganti nav atas. */
 function MobileTabBar() {
   const pathname = usePathname();
-  const { user, isStaff, isCopywriter } = useAuth();
-  const count = useAppSelector(selectCartCount);
-  const { openCartModal } = useCartModalContext();
+  const { user, isStaff } = useAuth();
 
   const item = (active: boolean) =>
     cn(
       "relative flex flex-1 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold",
-      active ? "text-ink" : "text-muted"
+      active ? "text-ink" : "text-muted",
     );
   const bar = (active: boolean) =>
-    active && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-ink" aria-hidden />;
+    active && (
+      <span
+        className="absolute top-0 h-0.5 w-8 rounded-full bg-ink"
+        aria-hidden
+      />
+    );
 
   return (
-    <nav className="glass fixed inset-x-0 bottom-0 z-40 border-t border-line/70 pb-safe sm:hidden" aria-label="Navigasi bawah">
+    <nav
+      className="glass fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 overflow-hidden rounded-2xl border border-line/70 shadow-[0_8px_30px_rgba(0,0,0,0.08)] lg:hidden"
+      aria-label="Navigasi bawah"
+    >
       <div className="flex h-16">
         <Link href="/" className={item(pathname === "/")}>
           {bar(pathname === "/")}
           <Home className="size-5" /> Beranda
         </Link>
-        <Link href="/shop" className={item(pathname.startsWith("/shop") || pathname.startsWith("/product"))}>
+        <Link
+          href="/shop"
+          className={item(
+            pathname.startsWith("/shop") || pathname.startsWith("/product"),
+          )}
+        >
           {bar(pathname.startsWith("/shop") || pathname.startsWith("/product"))}
           <Store className="size-5" /> Katalog
         </Link>
         <Link href="/journal" className={item(pathname.startsWith("/journal"))}>
           {bar(pathname.startsWith("/journal"))}
-          <BookOpen className="size-5" /> Jurnal
+          <BookOpen className="size-5" /> News
         </Link>
-        {isStaff ? (
-          <Link href={isCopywriter ? "/admin?tab=journal" : "/admin"} className={item(false)}>
-            <LayoutDashboard className="size-5" /> {isCopywriter ? "Studio" : "Panel"}
+        {isStaff && (
+          <Link href="/admin" className={item(pathname.startsWith("/admin"))}>
+            <LayoutDashboard className="size-5" /> Panel
           </Link>
-        ) : (
-          <button type="button" onClick={openCartModal} className={item(false)}>
-            <span className="relative">
-              <ShoppingBag className="size-5" />
-              {count > 0 && (
-                <span className="absolute -right-2.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-lime px-1 text-[10px] font-bold text-ink tabular">
-                  {count}
-                </span>
-              )}
-            </span>
-            Tas
-          </button>
         )}
-        {user ? (
-          <Link href={isStaff ? "/admin" : "/my-account"} className={item(pathname.startsWith("/my-account"))}>
+        {isStaff ? null : user ? (
+          <Link
+            href="/my-account"
+            className={item(pathname.startsWith("/my-account"))}
+          >
             {bar(pathname.startsWith("/my-account"))}
             <UserRound className="size-5" /> Akun
           </Link>

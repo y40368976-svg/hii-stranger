@@ -77,7 +77,7 @@ export function Menu({
   };
 
   return (
-    <div className={cn("relative inline-block", className)}>
+    <div className={cn("relative", /\b(hidden|block|inline-block|flex|inline-flex|grid)\b/.test(className ?? "") ? className : cn("inline-block", className))}>
       {trigger({ open, toggle: () => (open ? close() : setOpen(true)), ref: triggerRef })}
       {open && (
         <div

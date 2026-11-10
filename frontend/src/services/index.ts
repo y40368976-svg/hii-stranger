@@ -1,6 +1,7 @@
 import { api, fetchBlob } from "@/lib/api";
 import type {
   ApiAdminPayment,
+  ApiAnalytics,
   ApiBanner,
   ApiCart,
   ApiCategory,
@@ -32,6 +33,8 @@ export type ProductQuery = {
   min_price?: number;
   max_price?: number;
   availability_type?: string;
+  /** Hanya produk yang dibuat N hari terakhir. */
+  new_days?: number;
   sort?: string;
   page?: number;
   limit?: number;
@@ -44,6 +47,9 @@ export const authService = {
     api.post<AuthResult>("/auth/register", input, { auth: false }),
   verifyEmail: (token: string) => api.post<ApiUser>("/auth/verify-email", { token }, { auth: false }),
   resendVerification: () => api.post<void>("/auth/verification/resend"),
+  forgotPassword: (email: string) => api.post<void>("/auth/password/forgot", { email }, { auth: false }),
+  resetPassword: (token: string, password: string) =>
+    api.post<void>("/auth/password/reset", { token, password }, { auth: false }),
   me: () => api.get<ApiUser>("/users/me"),
   updateMe: (input: { name?: string; phone?: string | null }) => api.patch<ApiUser>("/users/me", input),
   changePassword: (input: { current_password: string; new_password: string }) =>
@@ -126,7 +132,7 @@ export const paymentService = {
   proof: (orderId: string) => fetchBlob("/orders/" + orderId + "/payment/proof"),
 };
 
-// ===== Admin & copywriter =====
+// ===== Admin & staff =====
 
 export type ProductInput = {
   category_id: string | null;
@@ -144,6 +150,7 @@ export type VariantInput = { sku: string; size: string; color: string | null; st
 
 export const adminService = {
   summary: () => api.get<ApiSummary>("/admin/summary"),
+  analytics: (days: 7 | 30 | 90) => api.get<ApiAnalytics>("/admin/analytics", { days }),
 
   orders: (query?: { page?: number; limit?: number; order_status?: string; q?: string }) =>
     api.list<ApiOrderListItem>("/admin/orders", query),
