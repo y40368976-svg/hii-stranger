@@ -1,11 +1,13 @@
 "use client";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useSyncExternalStore } from "react";
 import toast from "react-hot-toast";
-import { ImagePlus, Link2, Loader2, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImagePlus, Link2, Loader2, Search, Trash2 } from "lucide-react";
 import { adminService } from "@/services";
 import { errorMessage } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { Input } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
+import { Pagination } from "@/components/ui/misc";
 
 /** Jalankan aksi dengan toast sukses/gagal. undefined = gagal. */
 export async function run<T>(
@@ -33,8 +35,8 @@ export function PageHeader({
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="font-display text-[28px] font-extrabold uppercase leading-none tracking-tight md:text-4xl">
+      <div className="min-w-0">
+        <h1 className="break-words font-display text-[28px] font-extrabold uppercase leading-none tracking-tight md:text-4xl">
           {title}
         </h1>
         {description && (
@@ -42,7 +44,7 @@ export function PageHeader({
         )}
       </div>
       {actions && (
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>
       )}
     </div>
   );
@@ -247,5 +249,164 @@ export function ImageField({
         />
       )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Ringkasan mobile: 5 item per halaman + kolom cari dengan tombol.    */
+/* Hanya berlaku di < md (768px); desktop memakai Pagination biasa.    */
+/* ------------------------------------------------------------------ */
+
+export const MOBILE_PAGE = 5;
+const MOBILE_MQ = "(max-width: 767px)";
+
+function subscribeMobile(cb: () => void) {
+  const m = window.matchMedia(MOBILE_MQ);
+  m.addEventListener("change", cb);
+  return () => m.removeEventListener("change", cb);
+}
+
+/** true di layar < md. Di server selalu false. */
+export function useIsMobile() {
+  return useSyncExternalStore(
+    subscribeMobile,
+    () => window.matchMedia(MOBILE_MQ).matches,
+    () => false,
+  );
+}
+
+/**
+ * Limit paginasi server: 5 di mobile, `desktop` di layar besar.
+ * `onChange` dipanggil (mis. kembali ke halaman 1) saat limit berganti.
+ */
+export function useMobileLimit(desktop: number, onChange: () => void) {
+  const mobile = useIsMobile();
+  const limit = mobile ? MOBILE_PAGE : desktop;
+  const [prev, setPrev] = useState(limit);
+  if (prev !== limit) {
+    setPrev(limit);
+    onChange();
+  }
+  return { mobile, limit };
+}
+
+/** Kolom cari khusus mobile: pencarian jalan saat tombol "Cari" / Enter. */
+export function MobileSearch({
+  value,
+  onSearch,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onSearch: (q: string) => void;
+  placeholder: string;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState(value);
+  return (
+    <form
+      role="search"
+      className={cn("flex min-w-0 gap-2 md:hidden", className)}
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSearch(draft.trim());
+      }}
+    >
+      <div className="min-w-0 flex-1">
+        <Input
+          type="search"
+          enterKeyHint="search"
+          leading={<Search className="size-4" />}
+          className="h-11"
+          placeholder={placeholder}
+          aria-label={placeholder}
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            // Mengosongkan kolom langsung menampilkan semua lagi.
+            if (!e.target.value && value) onSearch("");
+          }}
+        />
+      </div>
+      <Button type="submit" variant="dark" className="shrink-0">
+        Cari
+      </Button>
+    </form>
+  );
+}
+
+/** Navigasi "sebelumnya / 5 berikutnya" khusus mobile. */
+export function MobilePager({
+  page,
+  total,
+  size = MOBILE_PAGE,
+  onPage,
+  className,
+}: {
+  page: number;
+  total: number;
+  size?: number;
+  onPage: (p: number) => void;
+  className?: string;
+}) {
+  if (total <= size) return null;
+  const pages = Math.ceil(total / size);
+  const from = (page - 1) * size + 1;
+  const to = Math.min(total, page * size);
+  const go = (p: number) => {
+    onPage(p);
+    // Kembali ke awal daftar supaya item baru langsung terlihat.
+    requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+  };
+  return (
+    <nav
+      aria-label="Halaman daftar"
+      className={cn("flex items-center gap-2 border-t border-line p-3 md:hidden", className)}
+    >
+      <Button
+        variant="soft"
+        className="shrink-0 px-3"
+        disabled={page <= 1}
+        onClick={() => go(page - 1)}
+        aria-label={size + " sebelumnya"}
+      >
+        <ChevronLeft className="size-4" />
+      </Button>
+      <p className="min-w-0 flex-1 text-center text-xs text-muted tabular">
+        {from}–{to} dari {total}
+      </p>
+      <Button
+        variant="soft"
+        className="shrink-0"
+        disabled={page >= pages}
+        onClick={() => go(page + 1)}
+      >
+        {size} berikutnya <ChevronRight className="size-4" />
+      </Button>
+    </nav>
+  );
+}
+
+/** Pager gabungan untuk daftar berpaginasi server: Pagination di desktop, MobilePager di mobile. */
+export function ListPager({
+  page,
+  limit,
+  total,
+  onPage,
+}: {
+  page: number;
+  limit: number;
+  total: number;
+  onPage: (p: number) => void;
+}) {
+  return (
+    <>
+      {total > limit && (
+        <div className="hidden border-t border-line p-4 md:block">
+          <Pagination page={page} limit={limit} total={total} onPage={onPage} />
+        </div>
+      )}
+      <MobilePager page={page} size={limit} total={total} onPage={onPage} />
+    </>
   );
 }

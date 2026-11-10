@@ -21,29 +21,33 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+/** Pengguna dari token tersimpan; null bila tidak ada token atau token ditolak. */
+async function fetchMe(): Promise<ApiUser | null> {
+  if (!tokenStore.get()) return null;
+  try {
+    return await authService.me();
+  } catch {
+    tokenStore.clear();
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<ApiUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
-    if (!tokenStore.get()) {
-      setUser(null);
-      return;
-    }
-    try {
-      setUser(await authService.me());
-    } catch {
-      tokenStore.clear();
-      setUser(null);
-    }
+    setUser(await fetchMe());
   }, []);
 
   useEffect(() => {
-    refreshUser().finally(() => setLoading(false));
+    fetchMe()
+      .then(setUser)
+      .finally(() => setLoading(false));
     const onExpired = () => setUser(null);
     window.addEventListener("auth:expired", onExpired);
     return () => window.removeEventListener("auth:expired", onExpired);
-  }, [refreshUser]);
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await authService.login(email, password);

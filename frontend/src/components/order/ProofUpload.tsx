@@ -25,22 +25,28 @@ export function ProofUpload({ orderId, onUploaded }: { orderId: string; onUpload
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
-  useEffect(() => {
-    if (!file || !file.type.startsWith("image/")) {
-      setPreview(null);
-      return;
-    }
-    const url = URL.createObjectURL(file);
+  // URL pratinjau dibuat saat file dipilih dan dicabut saat diganti / unmount.
+  const previewUrl = useRef<string | null>(null);
+  const choose = (f: File | null) => {
+    if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+    const url = f && f.type.startsWith("image/") ? URL.createObjectURL(f) : null;
+    previewUrl.current = url;
+    setFile(f);
     setPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+  };
+  useEffect(
+    () => () => {
+      if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+    },
+    [],
+  );
 
   const pick = (f: File | undefined) => {
     setError(null);
     if (!f) return;
     if (!TYPES.includes(f.type)) return setError("Format tidak didukung. Pakai JPG, PNG, WebP, atau PDF.");
     if (f.size > MAX_BYTES) return setError(`Ukuran ${sizeLabel(f.size)} melebihi batas 2 MB. Kirim tangkapan layar yang lebih kecil.`);
-    setFile(f);
+    choose(f);
   };
 
   const send = async () => {
@@ -49,7 +55,7 @@ export function ProofUpload({ orderId, onUploaded }: { orderId: string; onUpload
     try {
       const p = await paymentService.uploadProof(orderId, file);
       toast.success("Bukti terkirim. Admin akan memverifikasi.");
-      setFile(null);
+      choose(null);
       onUploaded(p);
     } catch (e) {
       setError(errorMessage(e));
@@ -118,7 +124,7 @@ export function ProofUpload({ orderId, onUploaded }: { orderId: string; onUpload
             <button
               type="button"
               aria-label="Batalkan berkas"
-              onClick={() => setFile(null)}
+              onClick={() => choose(null)}
               className="grid size-9 shrink-0 place-items-center rounded-full hover:bg-stone"
             >
               <X className="size-4" />

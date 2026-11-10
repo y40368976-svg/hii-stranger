@@ -14,11 +14,11 @@ export default function AdminSummary() {
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (loading || !s)
     return (
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-32" />
+          <Skeleton key={i} className="h-36" />
         ))}
-        <Skeleton className="h-72 md:col-span-4" />
+        <Skeleton className="col-span-2 h-72 md:col-span-4" />
       </div>
     );
 
@@ -40,7 +40,7 @@ export default function AdminSummary() {
             key={label}
             href={"/admin?tab=" + tab}
             className={
-              "group flex flex-col justify-between rounded-2xl border p-4 transition-colors md:p-5 " +
+              "group flex min-w-0 flex-col justify-between rounded-2xl border p-4 transition-colors md:p-5 " +
               (hot ? "border-ink bg-ink text-canvas" : "border-line bg-white hover:border-ink")
             }
           >
@@ -48,21 +48,21 @@ export default function AdminSummary() {
               <Icon className={"size-5 " + (hot ? "text-lime" : "text-muted")} />
               <ArrowRight className="size-4 opacity-0 transition-opacity group-hover:opacity-100" />
             </div>
-            <p className="mt-6 font-display text-4xl font-extrabold tabular">{value}</p>
+            <p className="mt-6 truncate font-display text-4xl font-extrabold tabular">{value}</p>
             <p className={"mt-1 text-[13px] " + (hot ? "text-canvas/70" : "text-muted")}>{label}</p>
           </Link>
         ))}
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-3">
-        <Panel className="p-5">
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Panel className="min-w-0 p-5">
           <p className="caps flex items-center gap-1.5 text-muted">
             <Wallet className="size-3.5" /> Omzet bulan ini
           </p>
-          <p className="mt-3 font-display text-3xl font-extrabold tabular">{formatRupiah(s.revenue_month)}</p>
+          <p className="mt-3 break-words font-display text-[clamp(1.5rem,7vw,1.875rem)] font-extrabold tabular">{formatRupiah(s.revenue_month)}</p>
           <p className="mt-1 text-xs text-muted">{s.paid_orders_month} pesanan terbayar · {s.orders_today} pesanan masuk hari ini</p>
         </Panel>
-        <Panel className="p-5 md:col-span-2">
+        <Panel className="min-w-0 p-5 md:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <p className="caps flex items-center gap-1.5 text-muted">
               <AlertTriangle className="size-3.5" /> Stok menipis (≤ 3)

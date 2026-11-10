@@ -163,7 +163,7 @@ export const adminService = {
     input: { courier_name: string; tracking_number: string | null; coverage_status: string; shipping_status: string }
   ) => api.put<ApiShipment>("/orders/" + orderId + "/shipment", input),
 
-  payments: (query?: { status?: string; page?: number; limit?: number }) =>
+  payments: (query?: { status?: string; q?: string; page?: number; limit?: number }) =>
     api.list<ApiAdminPayment>("/admin/payments", query),
   reviewPayment: (paymentId: string, status: "approved" | "rejected") =>
     api.post<ApiPayment>("/admin/payments/" + paymentId + "/review", { status }),

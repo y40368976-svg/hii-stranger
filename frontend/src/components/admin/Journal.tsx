@@ -27,7 +27,6 @@ import {
   Badge,
   EmptyState,
   ErrorState,
-  Pagination,
   Segmented,
   Skeleton,
   type Tone,
@@ -44,7 +43,7 @@ import type {
   PostInput,
   PostStatus,
 } from "@/types/api";
-import { ImageField, PageHeader, Panel, run } from "./kit";
+import { ImageField, ListPager, MobileSearch, PageHeader, Panel, run, useMobileLimit } from "./kit";
 import { cdn } from "@/lib/img";
 
 const STATUS: Record<PostStatus, { label: string; tone: Tone }> = {
@@ -81,15 +80,16 @@ function PostList({ onOpen }: { onOpen: (id: string | "new") => void }) {
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const { limit } = useMobileLimit(20, () => setPage(1));
   const list = useAsync(
     () =>
       adminService.posts({
         status: status || undefined,
         q: search || undefined,
         page,
-        limit: 20,
+        limit,
       }),
-    [status, search, page],
+    [status, search, page, limit],
   );
 
   useEffect(() => {
@@ -121,7 +121,8 @@ function PostList({ onOpen }: { onOpen: (id: string | "new") => void }) {
               { value: "archived", label: "Arsip" },
             ]}
           />
-          <div className="md:w-72">
+          <MobileSearch value={search} onSearch={(v) => (setSearch(v), setPage(1))} placeholder="Cari judul" />
+          <div className="hidden md:block md:w-72">
             <Input
               leading={<Search className="size-4" />}
               className="h-10"
@@ -199,15 +200,8 @@ function PostList({ onOpen }: { onOpen: (id: string | "new") => void }) {
             })}
           </ul>
         )}
-        {list.data && list.data.meta.total > 20 && (
-          <div className="border-t border-line p-4">
-            <Pagination
-              page={page}
-              limit={20}
-              total={list.data.meta.total}
-              onPage={setPage}
-            />
-          </div>
+        {list.data && (
+          <ListPager page={page} limit={limit} total={list.data.meta.total} onPage={setPage} />
         )}
       </Panel>
     </div>
@@ -260,9 +254,11 @@ function PostEditor({
   const imgInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    const d = detail.data;
-    if (!d) return;
+  // Isi form saat data artikel berganti (disetel saat render, bukan lewat effect).
+  const [loaded, setLoaded] = useState<typeof detail.data>(null);
+  const d = detail.data;
+  if (d !== loaded) setLoaded(d);
+  if (d && d !== loaded) {
     setF({
       title: d.title,
       slug: d.slug,
@@ -277,7 +273,7 @@ function PostEditor({
     setProducts(d.products);
     setSlugTouched(true);
     setDirty(false);
-  }, [detail.data]);
+  }
 
   const set = <K extends keyof PostInput>(k: K, v: PostInput[K]) => {
     setDirty(true);
@@ -662,11 +658,14 @@ function ProductPicker({
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<ApiPostProduct[]>([]);
+  const short = q.trim().length < 2;
+  const [prevShort, setPrevShort] = useState(short);
+  if (short !== prevShort) {
+    setPrevShort(short);
+    if (short) setResults([]);
+  }
   useEffect(() => {
-    if (q.trim().length < 2) {
-      setResults([]);
-      return;
-    }
+    if (q.trim().length < 2) return;
     const t = setTimeout(() => {
       productService
         .list({ q: q.trim(), limit: 6 })

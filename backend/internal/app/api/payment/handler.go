@@ -123,13 +123,18 @@ func (h *Handler) AdminList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	f := Filter{Status: q.Get("status"), OrderID: q.Get("order_id")}
+	f := Filter{Status: q.Get("status"), OrderID: q.Get("order_id"), Q: strings.TrimSpace(q.Get("q"))}
 	if f.Status != "" && !validStatus(f.Status) {
 		response.Error(w, http.StatusBadRequest, "bad_request", "Parameter status tidak valid.")
 		return
 	}
 	if f.OrderID != "" && !validator.UUID(f.OrderID) {
 		response.Error(w, http.StatusBadRequest, "bad_request", "Parameter order_id tidak valid.")
+		return
+	}
+
+	if len([]rune(f.Q)) > 100 {
+		response.Error(w, http.StatusBadRequest, "bad_request", "Parameter q maksimal 100 karakter.")
 		return
 	}
 

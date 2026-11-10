@@ -130,7 +130,11 @@ export function Select<V extends string>({
     el?.scrollIntoView({ block: "nearest" });
   }, [active, open]);
 
-  useEffect(() => setActive(0), [query]);
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (query !== prevQuery) {
+    setPrevQuery(query);
+    setActive(0);
+  }
 
   const choose = (o: SelectOption<V> | undefined) => {
     if (!o || o.disabled) return;
@@ -162,10 +166,16 @@ export function Select<V extends string>({
         else move(-1);
         break;
       case "Home":
-        if (open) (e.preventDefault(), setActive(0));
+        if (open) {
+          e.preventDefault();
+          setActive(0);
+        }
         break;
       case "End":
-        if (open) (e.preventDefault(), setActive(filtered.length - 1));
+        if (open) {
+          e.preventDefault();
+          setActive(filtered.length - 1);
+        }
         break;
       case "Enter":
       case " ":
@@ -175,7 +185,10 @@ export function Select<V extends string>({
         else openPanel();
         break;
       case "Escape":
-        if (open) (e.preventDefault(), close());
+        if (open) {
+          e.preventDefault();
+          close();
+        }
         break;
       case "Tab":
         if (open) close();

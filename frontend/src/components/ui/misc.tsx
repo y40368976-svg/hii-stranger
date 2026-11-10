@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useState, useSyncExternalStore } from "react";
 import { AlertTriangle, Check, ChevronLeft, ChevronRight, Copy, PackageOpen, RotateCw } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/cn";
@@ -232,14 +232,30 @@ export function Segmented<V extends string>({
   );
 }
 
+// Jam bersama (detik-an) untuk useCountdown; null di server supaya hydration cocok.
+const clockSubs = new Set<() => void>();
+let clockNow: number | null = null;
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+function subscribeClock(cb: () => void) {
+  clockSubs.add(cb);
+  clockTimer ??= setInterval(() => {
+    clockNow = Date.now();
+    clockSubs.forEach((f) => f());
+  }, 1000);
+  return () => {
+    clockSubs.delete(cb);
+    if (!clockSubs.size && clockTimer) {
+      clearInterval(clockTimer);
+      clockTimer = null;
+      clockNow = null;
+    }
+  };
+}
+const readClock = () => (clockNow ??= Date.now());
+
 /** Hitung mundur ke batas waktu (mis. batas bayar). */
 export function useCountdown(target?: string | null) {
-  const [now, setNow] = useState<number | null>(null);
-  useEffect(() => {
-    setNow(Date.now());
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
+  const now = useSyncExternalStore<number | null>(subscribeClock, readClock, () => null);
   if (!target || now === null) return null;
   const ms = new Date(target).getTime() - now;
   if (Number.isNaN(ms)) return null;

@@ -89,6 +89,7 @@ type Proof struct {
 type Filter struct {
 	Status  string
 	OrderID string
+	Q       string // cari sebagian: nomor order, ID pembayaran, nama/email pelanggan
 }
 
 // contact berisi data untuk email notifikasi.

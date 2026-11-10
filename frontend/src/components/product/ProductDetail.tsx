@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -97,15 +97,16 @@ export default function ProductDetail() {
   );
   const totalStock = (p?.variants ?? []).reduce((n, v) => n + v.stock, 0);
 
-  useEffect(() => {
-    if (!p) return;
+  const [seen, setSeen] = useState<typeof p | null>(null);
+  if (p && p !== seen) {
+    setSeen(p);
     setImgIdx(0);
     const firstColor =
       p.variants.find((v) => v.stock > 0)?.color ?? p.variants[0]?.color ?? "";
     setColor(firstColor);
     setVariantId(null);
     setQty(1);
-  }, [p]);
+  }
 
   const related = useAsync(
     () =>
