@@ -1,0 +1,14 @@
+{
+  "model": "opus",
+  "effortLevel": "medium",
+  "permissions": {
+    "deny": [
+      "Read(./frontend/.next/**)",
+      "Read(./frontend/pnpm-lock.yaml)",
+      "Read(./frontend/tsconfig.tsbuildinfo)",
+      "Read(./backend/go.sum)",
+      "Read(./backend/.env)",
+      "Read(./frontend/.env.local)"
+    ]
+  }
+}
