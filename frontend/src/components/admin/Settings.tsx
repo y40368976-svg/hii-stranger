@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { QrCode, Wrench } from "lucide-react";
 import { settingService, adminService } from "@/services";
 import { useAsync } from "@/hooks/useAsync";
@@ -85,10 +85,12 @@ function MaintenanceForm({ settings, onSaved }: { settings: ApiSiteSettings; onS
   const [on, setOn] = useState(settings.maintenance_mode);
   const [msg, setMsg] = useState(settings.maintenance_message);
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
+  const [prev, setPrev] = useState(settings);
+  if (prev !== settings) {
+    setPrev(settings);
     setOn(settings.maintenance_mode);
     setMsg(settings.maintenance_message);
-  }, [settings]);
+  }
 
   return (
     <Panel className="p-5 md:p-6">

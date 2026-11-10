@@ -11,18 +11,15 @@ import { AuthShell } from "./AuthShell";
 export default function VerifyEmail() {
   const token = useSearchParams().get("token") ?? "";
   const { user, refreshUser } = useAuth();
-  const [state, setState] = useState<"loading" | "ok" | "error">("loading");
-  const [msg, setMsg] = useState("");
+  const [status, setState] = useState<"loading" | "ok" | "error">("loading");
+  const [message, setMsg] = useState("");
+  const state = token ? status : "error";
+  const msg = token ? message : "Tautan verifikasi tidak lengkap.";
   const ran = useRef(false);
 
   useEffect(() => {
-    if (ran.current) return;
+    if (ran.current || !token) return;
     ran.current = true;
-    if (!token) {
-      setState("error");
-      setMsg("Tautan verifikasi tidak lengkap.");
-      return;
-    }
     authService
       .verifyEmail(token)
       .then(() => {

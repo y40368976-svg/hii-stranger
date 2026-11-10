@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowDownUp, SlidersHorizontal, X } from "lucide-react";
 import { bannerService, productService } from "@/services";
@@ -249,13 +249,16 @@ function FilterDialog({
   const [a, setA] = useState(availability);
   const [lo, setLo] = useState(min);
   const [hi, setHi] = useState(max);
-  useEffect(() => {
+  const sig = open ? [availability, min, max].join("\u0000") : null;
+  const [prevSig, setPrevSig] = useState(sig);
+  if (sig !== prevSig) {
+    setPrevSig(sig);
     if (open) {
       setA(availability);
       setLo(min);
       setHi(max);
     }
-  }, [open, availability, min, max]);
+  }
   const invalid = lo !== "" && hi !== "" && Number(lo) > Number(hi);
 
   return (

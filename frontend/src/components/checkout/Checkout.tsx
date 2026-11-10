@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -15,7 +15,7 @@ import { Button, LinkButton } from "@/components/ui/Button";
 import { Field, Input, Textarea } from "@/components/ui/Field";
 import { Select } from "@/components/ui/Select";
 import { EmptyState, Skeleton } from "@/components/ui/misc";
-import type { ApiRegion, ApiShippingQuote } from "@/types/api";
+import type { ApiRegion } from "@/types/api";
 import { cdn } from "@/lib/img";
 
 type Form = {
@@ -33,6 +33,37 @@ const SAVED_KEY = "hs_last_address";
 const toOptions = (rs: ApiRegion[] | null) =>
   (rs ?? []).map((r) => ({ value: String(r.id), label: r.name, description: r.zip_code && r.zip_code !== "0" ? "Kode pos " + r.zip_code : undefined }));
 
+/**
+ * Muat data untuk satu key; hasil/error hanya berlaku untuk key yang sedang
+ * aktif, jadi ganti key otomatis mengosongkan data lama dan menandai loading.
+ */
+function useKeyed<T>(key: string | null, load: (key: string) => Promise<T>, onError?: (message: string) => void) {
+  const [res, setRes] = useState<{ key: string; data: T | null; error: string | null } | null>(null);
+  const fn = useRef({ load, onError });
+  useEffect(() => {
+    fn.current = { load, onError };
+  });
+  useEffect(() => {
+    if (key === null) return;
+    let live = true;
+    fn.current.load(key).then(
+      (data) => {
+        if (live) setRes({ key, data, error: null });
+      },
+      (e) => {
+        const message = errorMessage(e);
+        fn.current.onError?.(message);
+        if (live) setRes({ key, data: null, error: message });
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [key]);
+  const hit = key !== null && res?.key === key ? res : null;
+  return { data: hit?.data ?? null, error: hit?.error ?? null, loading: key !== null && !hit };
+}
+
 export default function Checkout() {
   const { user, loading, isStaff, canOrder } = useAuth();
   const { items, subtotal, loaded } = useAppSelector(selectCart);
@@ -41,14 +72,6 @@ export default function Checkout() {
 
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
-  const [provinces, setProvinces] = useState<ApiRegion[] | null>(null);
-  const [cities, setCities] = useState<ApiRegion[] | null>(null);
-  const [districts, setDistricts] = useState<ApiRegion[] | null>(null);
-  const [subs, setSubs] = useState<ApiRegion[] | null>(null);
-  const [loadingLevel, setLoadingLevel] = useState<string | null>(null);
-  const [quote, setQuote] = useState<ApiShippingQuote | null>(null);
-  const [quoteError, setQuoteError] = useState<string | null>(null);
-  const [quoting, setQuoting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -56,8 +79,9 @@ export default function Checkout() {
   }, [loading, user, router]);
 
   // Prefill dari akun & alamat terakhir (disimpan di perangkat ini saja).
-  useEffect(() => {
-    if (!user) return;
+  const [prefilled, setPrefilled] = useState<typeof user>(null);
+  if (user && user !== prefilled) {
+    setPrefilled(user);
     let saved: Partial<Form> = {};
     try {
       saved = JSON.parse(localStorage.getItem(SAVED_KEY) ?? "{}");
@@ -72,48 +96,27 @@ export default function Checkout() {
       district: saved.district || "",
       subdistrict: saved.subdistrict || "",
     }));
-  }, [user]);
+  }
 
-  const loadLevel = async <T,>(level: string, fn: () => Promise<T>, set: (v: T) => void) => {
-    setLoadingLevel(level);
-    try {
-      set(await fn());
-    } catch (e) {
-      toast.error(errorMessage(e));
-    } finally {
-      setLoadingLevel(null);
-    }
-  };
+  const toastError = (m: string) => toast.error(m);
+  const provincesQ = useKeyed(canOrder ? "all" : null, () => regionService.provinces(), toastError);
+  const citiesQ = useKeyed(form.province || null, (k) => regionService.cities(Number(k)), toastError);
+  const districtsQ = useKeyed(form.city || null, (k) => regionService.districts(Number(k)), toastError);
+  const subsQ = useKeyed(form.district || null, (k) => regionService.subdistricts(Number(k)), toastError);
+  const provinces = provincesQ.data;
+  const cities = citiesQ.data;
+  const districts = districtsQ.data;
+  const subs = subsQ.data;
+  const loadingLevel = provincesQ.loading ? "province" : citiesQ.loading ? "city" : districtsQ.loading ? "district" : subsQ.loading ? "subdistrict" : null;
 
-  useEffect(() => {
-    if (canOrder) loadLevel("province", regionService.provinces, setProvinces);
-  }, [canOrder]);
-  useEffect(() => {
-    setCities(null);
-    if (form.province) loadLevel("city", () => regionService.cities(Number(form.province)), setCities);
-  }, [form.province]);
-  useEffect(() => {
-    setDistricts(null);
-    if (form.city) loadLevel("district", () => regionService.districts(Number(form.city)), setDistricts);
-  }, [form.city]);
-  useEffect(() => {
-    setSubs(null);
-    if (form.district) loadLevel("subdistrict", () => regionService.subdistricts(Number(form.district)), setSubs);
-  }, [form.district]);
-
+  // Ongkir dihitung ulang saat kelurahan atau isi keranjang berubah.
   const cartKey = items.map((i) => i.id + ":" + i.quantity).join(",");
-  useEffect(() => {
-    setQuote(null);
-    setQuoteError(null);
-    if (!form.subdistrict || !items.length) return;
-    setQuoting(true);
-    regionService
-      .shippingCost(Number(form.subdistrict))
-      .then(setQuote)
-      .catch((e) => setQuoteError(errorMessage(e)))
-      .finally(() => setQuoting(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.subdistrict, cartKey]);
+  const quoteQ = useKeyed(form.subdistrict && items.length ? form.subdistrict + "|" + cartKey : null, (k) =>
+    regionService.shippingCost(Number(k.split("|")[0])),
+  );
+  const quote = quoteQ.data;
+  const quoteError = quoteQ.error;
+  const quoting = quoteQ.loading;
 
   const set = (k: keyof Form, v: string) => {
     setErrors((e) => ({ ...e, [k]: undefined }));

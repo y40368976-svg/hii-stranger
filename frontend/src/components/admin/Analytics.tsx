@@ -43,11 +43,11 @@ export default function AdminAnalytics() {
       {error ? (
         <ErrorState message={error} onRetry={reload} />
       ) : loading || !data ? (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
           {[0, 1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-28" />
           ))}
-          <Skeleton className="col-span-2 h-72 lg:col-span-4" />
+          <Skeleton className="h-72 sm:col-span-2 lg:col-span-4" />
         </div>
       ) : (
         <Report a={data} />
@@ -72,7 +72,7 @@ function Report({ a }: { a: ApiAnalytics }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         {kpis.map((k, i) => (
           // Bukan <Panel>: cn() tidak me-merge class, jadi bg-white bawaan Panel
           // akan menimpa bg-ink dan teks terang jadi tak terbaca.
@@ -82,7 +82,7 @@ function Report({ a }: { a: ApiAnalytics }) {
           >
             <p className={cn("text-[13px] font-semibold", i === 0 ? "text-canvas/70" : "text-muted")}>{k.label}</p>
             {/* Ukuran huruf ikut lebar kartu (container query) supaya angka tidak terpotong/terpecah. */}
-            <p className="mt-2 whitespace-nowrap font-display text-[clamp(1rem,8cqi,1.875rem)] font-extrabold leading-tight tabular" title={k.value}>
+            <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap font-display text-[clamp(1rem,8cqi,1.875rem)] font-extrabold leading-tight tabular" title={k.value}>
               {k.value}
             </p>
             <Delta now={k.now} prev={k.prev} dark={i === 0} />
@@ -90,12 +90,12 @@ function Report({ a }: { a: ApiAnalytics }) {
         ))}
       </div>
 
-      <Panel className="p-4 md:p-5">
+      <Panel className="min-w-0 p-4 md:p-5">
         <RevenueChart series={a.series} />
       </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-5">
-        <Panel className="p-4 md:p-5 lg:col-span-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <Panel className="min-w-0 p-4 md:p-5 lg:col-span-3">
           <p className="mb-4 flex items-center gap-1.5 font-bold">
             <Trophy className="size-4 text-muted" /> Produk terlaris
           </p>
@@ -127,7 +127,7 @@ function Report({ a }: { a: ApiAnalytics }) {
           )}
         </Panel>
 
-        <Panel className="p-4 md:p-5 lg:col-span-2">
+        <Panel className="min-w-0 p-4 md:p-5 lg:col-span-2">
           <p className="font-bold">Status pesanan</p>
           <p className="mb-4 text-xs text-muted">
             {fmtNum(c.all_orders)} pesanan masuk · {fmtNum(c.items_sold)} barang terjual · batal {cancelRate.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%
@@ -137,7 +137,7 @@ function Report({ a }: { a: ApiAnalytics }) {
               const n = a.statuses[s] ?? 0;
               const pct = c.all_orders ? (n / c.all_orders) * 100 : 0;
               return (
-                <li key={s} className="grid grid-cols-[7.5rem_1fr_2.5rem] items-center gap-2 text-sm">
+                <li key={s} className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_2.5rem] items-center gap-2 text-sm">
                   <span className="truncate text-ink-3">{ORDER_STATUS_LABEL[s]}</span>
                   <div className="h-1.5 overflow-hidden rounded-full bg-stone">
                     <div className={cn("h-full rounded-full", s === "cancelled" ? "bg-line-strong" : "bg-ink")} style={{ width: `${pct}%` }} />
@@ -161,7 +161,7 @@ function Delta({ now, prev, dark }: { now: number; prev: number; dark?: boolean 
   const up = pct > 0;
   const Icon = flat ? Minus : up ? ArrowUpRight : ArrowDownRight;
   return (
-    <p className={cn("mt-1 flex items-center gap-1 text-xs font-semibold", flat ? muted : up ? (dark ? "text-lime" : "text-success") : dark ? "text-canvas" : "text-danger")}>
+    <p className={cn("mt-1 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs font-semibold", flat ? muted : up ? (dark ? "text-lime" : "text-success") : dark ? "text-canvas" : "text-danger")}>
       <Icon className="size-3.5" aria-hidden />
       <span className="tabular">{flat ? "Stabil" : (up ? "+" : "") + pct.toLocaleString("id-ID", { maximumFractionDigits: 1 }) + "%"}</span>
       <span className={cn("font-normal", muted)}>vs periode lalu</span>
@@ -181,11 +181,11 @@ function RevenueChart({ series }: { series: ApiAnalytics["series"] }) {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="font-bold">Omzet harian</p>
           <p className="text-xs text-muted">{shown ? dayLabel(shown.date, true) : "Total " + series.length + " hari"}</p>
         </div>
-        <p className="text-right" aria-live="polite">
+        <p className="min-w-0 text-right" aria-live="polite">
           <span className="block font-display text-xl font-extrabold tabular">{formatRupiah(shown ? shown.revenue : total)}</span>
           <span className="text-xs text-muted tabular">
             {shown ? fmtNum(shown.orders) + " pesanan" : "Puncak " + shortRupiah(max === 1 && !total ? 0 : max)}

@@ -4,11 +4,11 @@ import { Check, ExternalLink, FileText, X } from "lucide-react";
 import { adminService, paymentService } from "@/services";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDate, formatRupiah, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, timeAgo } from "@/lib/format";
-import { Badge, EmptyState, ErrorState, Pagination, Segmented, Skeleton } from "@/components/ui/misc";
+import { Badge, EmptyState, ErrorState, Segmented, Skeleton } from "@/components/ui/misc";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import type { ApiAdminPayment } from "@/types/api";
-import { PageHeader, Panel, run } from "./kit";
+import { ListPager, MobileSearch, PageHeader, Panel, run, useMobileLimit } from "./kit";
 
 const LIMIT = 20;
 
@@ -16,7 +16,12 @@ export default function AdminPayments() {
   const [status, setStatus] = useState("pending");
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<ApiAdminPayment | null>(null);
-  const list = useAsync(() => adminService.payments({ status: status || undefined, page, limit: LIMIT }), [status, page]);
+  // Kolom cari hanya ada di mobile; desktop tidak mengirim `q`.
+  const [search, setSearch] = useState("");
+  const { mobile, limit } = useMobileLimit(LIMIT, () => setPage(1));
+  const q = mobile && search ? search : undefined;
+  const list = useAsync(() => adminService.payments({ status: status || undefined, q, page, limit }), [status, q, page, limit]);
+  const rows = list.data?.data ?? [];
 
   return (
     <div>
@@ -25,7 +30,8 @@ export default function AdminPayments() {
         description="Cocokkan nominal unik di bukti dengan mutasi QRIS di aplikasi merchant. Setujui untuk memindahkan pesanan ke antrean kemas."
       />
       <Panel>
-        <div className="border-b border-line p-4">
+        <div className="flex flex-col gap-3 border-b border-line p-4">
+          <MobileSearch value={search} onSearch={(v) => (setSearch(v), setPage(1))} placeholder="No. order / nama / email" />
           <Segmented
             value={status}
             onChange={(v) => (setStatus(v), setPage(1))}
@@ -47,11 +53,13 @@ export default function AdminPayments() {
               <Skeleton key={i} className="h-16" />
             ))}
           </div>
-        ) : !list.data?.data.length ? (
+        ) : !rows.length && q ? (
+          <EmptyState title="Tidak ditemukan" description="Coba kata kunci lain." />
+        ) : !rows.length ? (
           <EmptyState title={status === "pending" ? "Antrean kosong" : "Tidak ada data"} description={status === "pending" ? "Semua bukti sudah diverifikasi." : undefined} />
         ) : (
           <ul className="divide-y divide-line">
-            {list.data.data.map((p) => {
+            {rows.map((p) => {
               const actionable = p.status === "pending" && p.has_proof && p.order_status === "pending_payment";
               return (
                 <li key={p.id} className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:px-5">
@@ -86,11 +94,7 @@ export default function AdminPayments() {
             })}
           </ul>
         )}
-        {list.data && list.data.meta.total > LIMIT && (
-          <div className="border-t border-line p-4">
-            <Pagination page={page} limit={LIMIT} total={list.data.meta.total} onPage={setPage} />
-          </div>
-        )}
+        {list.data && <ListPager page={page} limit={limit} total={list.data.meta.total} onPage={setPage} />}
       </Panel>
       {open && <ReviewDialog payment={open} onClose={() => setOpen(null)} onDone={() => (setOpen(null), list.reload())} />}
     </div>

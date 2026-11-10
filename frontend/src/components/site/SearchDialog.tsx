@@ -14,30 +14,39 @@ import { cdn } from "@/lib/img";
 export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<ApiProduct[]>([]);
-  const [loading, setLoading] = useState(false);
   const categories = useCategories();
   const router = useRouter();
+  const term = q.trim();
+  const short = term.length < 2;
+  // Term terakhir yang permintaannya sudah selesai; loading diturunkan dari sini.
+  const [settled, setSettled] = useState("");
+  const loading = !short && settled !== term;
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (!open) setQ("");
-  }, [open]);
+  }
+  const [prevShort, setPrevShort] = useState(short);
+  if (short !== prevShort) {
+    setPrevShort(short);
+    if (short) {
+      setResults([]);
+      setSettled("");
+    }
+  }
 
   useEffect(() => {
-    const term = q.trim();
-    if (term.length < 2) {
-      setResults([]);
-      return;
-    }
-    setLoading(true);
+    if (term.length < 2) return;
     const t = setTimeout(() => {
       productService
         .list({ q: term, limit: 6 })
         .then((r) => setResults(r.data))
         .catch(() => setResults([]))
-        .finally(() => setLoading(false));
+        .finally(() => setSettled(term));
     }, 250);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [term]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();

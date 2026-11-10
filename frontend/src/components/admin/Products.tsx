@@ -18,7 +18,6 @@ import {
   Badge,
   EmptyState,
   ErrorState,
-  Pagination,
   Segmented,
   Skeleton,
 } from "@/components/ui/misc";
@@ -37,6 +36,9 @@ import {
   DesktopOnly,
   ImageField,
   MobileList,
+  MobileSearch,
+  ListPager,
+  useMobileLimit,
   PageHeader,
   Panel,
   run,
@@ -69,6 +71,7 @@ export default function AdminProducts() {
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<string | "new" | null>(sp.get("edit"));
+  const { limit } = useMobileLimit(LIMIT, () => setPage(1));
   const cats = useAsync(() => adminService.categories(), []);
   const list = useAsync(
     () =>
@@ -78,9 +81,9 @@ export default function AdminProducts() {
         category_id: category || undefined,
         sort: "newest",
         page,
-        limit: LIMIT,
+        limit,
       }),
-    [search, status, category, page],
+    [search, status, category, page, limit],
   );
 
   useEffect(() => {
@@ -127,7 +130,8 @@ export default function AdminProducts() {
                 aria-label="Filter kategori"
               />
             </div>
-            <div className="sm:w-64">
+            <MobileSearch value={search} onSearch={(v) => (setSearch(v), setPage(1))} placeholder="Cari nama produk" />
+            <div className="hidden md:block md:w-64">
               <Input
                 leading={<Search className="size-4" />}
                 className="h-10"
@@ -272,15 +276,8 @@ export default function AdminProducts() {
           </DesktopOnly>
           </>
         )}
-        {list.data && list.data.meta.total > LIMIT && (
-          <div className="border-t border-line p-4">
-            <Pagination
-              page={page}
-              limit={LIMIT}
-              total={list.data.meta.total}
-              onPage={setPage}
-            />
-          </div>
+        {list.data && (
+          <ListPager page={page} limit={limit} total={list.data.meta.total} onPage={setPage} />
         )}
       </Panel>
       {editing && (
@@ -824,7 +821,11 @@ function useVariantStock(
   const [stock, setStock] = useState(String(v.stock));
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
-  useEffect(() => setStock(String(v.stock)), [v.stock]);
+  const [prevStock, setPrevStock] = useState(v.stock);
+  if (prevStock !== v.stock) {
+    setPrevStock(v.stock);
+    setStock(String(v.stock));
+  }
   const n = Number(stock) || 0;
   const dirty = n !== v.stock;
   const save = async () => {

@@ -7,13 +7,13 @@ import { adminService, orderService, paymentService } from "@/services";
 import { useAsync } from "@/hooks/useAsync";
 import { formatDate, formatRupiah, joinAddress, ORDER_STATUS_LABEL, ORDER_STATUS_TONE, PAYMENT_STATUS_LABEL, SHIPPING_STATUS_LABEL, timeAgo } from "@/lib/format";
 import { trackingLinks } from "@/lib/tracking";
-import { Badge, CopyButton, EmptyState, ErrorState, Pagination, Segmented, Skeleton } from "@/components/ui/misc";
+import { Badge, CopyButton, EmptyState, ErrorState, Segmented, Skeleton } from "@/components/ui/misc";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Field, Input, Textarea } from "@/components/ui/Field";
 import { Select } from "@/components/ui/Select";
 import type { ApiOrderDetail, ApiOrderListItem, OrderStatus } from "@/types/api";
-import { DesktopOnly, MobileList, PageHeader, Panel, run, Table, td } from "./kit";
+import { DesktopOnly, ListPager, MobileList, MobileSearch, PageHeader, Panel, run, Table, td, useMobileLimit } from "./kit";
 import { cdn } from "@/lib/img";
 
 const LIMIT = 20;
@@ -43,7 +43,8 @@ export default function AdminOrders() {
   const [openId, setOpenId] = useState<string | null>(() =>
     typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("open")
   );
-  const list = useAsync(() => adminService.orders({ page, limit: LIMIT, order_status: status || undefined, q: search || undefined }), [page, status, search]);
+  const { limit } = useMobileLimit(LIMIT, () => setPage(1));
+  const list = useAsync(() => adminService.orders({ page, limit, order_status: status || undefined, q: search || undefined }), [page, limit, status, search]);
 
   useEffect(() => {
     const t = setTimeout(() => (setSearch(q.trim()), setPage(1)), 350);
@@ -56,7 +57,8 @@ export default function AdminOrders() {
       <Panel>
         <div className="flex flex-col gap-3 border-b border-line p-4 md:flex-row md:items-center">
           <Segmented value={status} onChange={(v) => (setStatus(v), setPage(1))} options={FILTERS} className="flex-1" />
-          <div className="md:w-72">
+          <MobileSearch value={search} onSearch={(v) => (setSearch(v), setPage(1))} placeholder="No. order / nama penerima" />
+          <div className="hidden md:block md:w-72">
             <Input leading={<Search className="size-4" />} className="h-10" placeholder="No. order / nama penerima" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari pesanan" />
           </div>
         </div>
@@ -115,11 +117,7 @@ export default function AdminOrders() {
           </DesktopOnly>
           </>
         )}
-        {list.data && list.data.meta.total > LIMIT && (
-          <div className="border-t border-line p-4">
-            <Pagination page={page} limit={LIMIT} total={list.data.meta.total} onPage={setPage} />
-          </div>
-        )}
+        {list.data && <ListPager page={page} limit={limit} total={list.data.meta.total} onPage={setPage} />}
       </Panel>
 
       {openId && <OrderDrawer id={openId} onClose={() => setOpenId(null)} onChanged={list.reload} />}
@@ -470,12 +468,15 @@ function ShipDialog({
 }) {
   const [tracking, setTracking] = useState("");
   const [courier, setCourier] = useState(defaultCourier);
-  useEffect(() => {
+  const sig = open ? defaultCourier : null;
+  const [prevSig, setPrevSig] = useState(sig);
+  if (sig !== prevSig) {
+    setPrevSig(sig);
     if (open) {
       setTracking("");
       setCourier(defaultCourier);
     }
-  }, [open, defaultCourier]);
+  }
   return (
     <Dialog
       open={open}
@@ -508,9 +509,11 @@ function ShipDialog({
 
 function CancelDialog({ open, onClose, busy, onSubmit }: { open: boolean; onClose: () => void; busy: boolean; onSubmit: (reason: string) => void }) {
   const [reason, setReason] = useState("");
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) setReason("");
-  }, [open]);
+  }
   return (
     <Dialog
       open={open}
