@@ -1659,6 +1659,15 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: q
+          in: query
+          description: >-
+            Cari sebagian nomor order, ID pembayaran, nama pelanggan, atau email
+            pelanggan (tidak peka huruf besar/kecil). Digabung (AND) dengan filter
+            lain; kosong berarti tanpa pencarian.
+          schema:
+            type: string
+            maxLength: 100
       responses:
         "200":
           description: Daftar pembayaran.

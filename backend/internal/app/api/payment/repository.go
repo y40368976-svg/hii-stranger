@@ -174,25 +174,15 @@ func (r *Repository) GetProof(ctx context.Context, orderID string) (Proof, error
 // List mengambil satu halaman pembayaran (antrean verifikasi admin). Yang
 // menunggu verifikasi (pending dengan bukti) diletakkan paling atas.
 func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]AdminItem, int, error) {
-	var conds []string
-	var args []any
-	add := func(cond string, v any) {
-		args = append(args, v)
-		conds = append(conds, fmt.Sprintf(cond, len(args)))
-	}
-	if f.Status != "" {
-		add("p.status = $%d", f.Status)
-	}
-	if f.OrderID != "" {
-		add("p.order_id = $%d", f.OrderID)
-	}
-	where := ""
-	if len(conds) > 0 {
-		where = " WHERE " + strings.Join(conds, " AND ")
-	}
+	where, args := f.where()
 
+	// Pencarian menyentuh kolom orders dan users, jadi hitungan ikut di-join.
+	countFrom := "payments p"
+	if f.Q != "" {
+		countFrom += " JOIN orders o ON o.id = p.order_id JOIN users u ON u.id = o.user_id"
+	}
 	var total int
-	if err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM payments p"+where, args...).Scan(&total); err != nil {
+	if err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM "+countFrom+where, args...).Scan(&total); err != nil {
 		return nil, 0, wrap("count", err)
 	}
 
@@ -226,6 +216,36 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]A
 		return nil, 0, wrap("list rows", err)
 	}
 	return out, total, nil
+}
+
+// where menyusun klausa WHERE daftar pembayaran beserta argumennya. Alias:
+// p = payments, o = orders, u = users.
+func (f Filter) where() (string, []any) {
+	var conds []string
+	var args []any
+	add := func(cond string, v any) {
+		args = append(args, v)
+		conds = append(conds, fmt.Sprintf(cond, len(args)))
+	}
+	if f.Status != "" {
+		add("p.status = $%d", f.Status)
+	}
+	if f.OrderID != "" {
+		add("p.order_id = $%d", f.OrderID)
+	}
+	if f.Q != "" {
+		add(`(o.order_number ILIKE $%[1]d ESCAPE '\' OR p.id::text ILIKE $%[1]d ESCAPE '\'`+
+			` OR u.name ILIKE $%[1]d ESCAPE '\' OR u.email ILIKE $%[1]d ESCAPE '\')`, "%"+escapeLike(f.Q)+"%")
+	}
+	if len(conds) == 0 {
+		return "", nil
+	}
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+// escapeLike membuat %, _, dan \ dibaca apa adanya oleh ILIKE.
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
 func (r *Repository) Review(ctx context.Context, paymentID, adminID, status string) (Payment, error) {
