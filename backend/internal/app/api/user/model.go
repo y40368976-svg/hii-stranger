@@ -12,8 +12,10 @@ import (
 const (
 	RoleCustomer = "customer"
 	RoleAdmin    = "admin"
-	// RoleCopywriter hanya boleh mengelola jurnal/artikel, tidak bisa belanja.
-	RoleCopywriter = "copywriter"
+	// RoleStaff mengelola operasional toko (katalog, pesanan, pembayaran,
+	// jurnal) tetapi tidak bisa mengubah pengaturan toko atau pengguna.
+	// Seperti admin, staff tidak bisa belanja.
+	RoleStaff      = "staff"
 	StatusActive   = "active"
 	StatusInactive = "inactive"
 )
@@ -30,6 +32,8 @@ var (
 	ErrSelfLockout = errors.New("user: admin cannot demote or deactivate self")
 	// ErrInvalidVerification: token verifikasi email tidak dikenal atau kedaluwarsa.
 	ErrInvalidVerification = errors.New("user: invalid or expired verification token")
+	// ErrInvalidPasswordReset: token reset password tidak dikenal atau kedaluwarsa.
+	ErrInvalidPasswordReset = errors.New("user: invalid or expired password reset token")
 )
 
 // OptionalString membedakan field JSON yang tidak dikirim (Set false), yang
@@ -117,4 +121,9 @@ func (u User) Response() Response {
 		EmailVerifiedAt: u.EmailVerifiedAt,
 		CreatedAt:       u.CreatedAt,
 	}
+}
+
+// IsBackoffice true untuk akun staf toko (admin atau staff).
+func IsBackoffice(role string) bool {
+	return role == RoleAdmin || role == RoleStaff
 }

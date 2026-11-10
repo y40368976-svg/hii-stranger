@@ -113,4 +113,6 @@ type Filter struct {
 	MinPrice         string
 	MaxPrice         string
 	Sort             string
+	// NewDays > 0 membatasi ke produk yang dibuat N hari terakhir ("Baru datang").
+	NewDays int
 }

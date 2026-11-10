@@ -7,9 +7,14 @@ let cache: ApiCategory[] | null = null;
 
 /** Kategori aktif (di-cache per sesi halaman). */
 export function useCategories() {
-  const [categories, setCategories] = useState<ApiCategory[]>(cache ?? []);
+  // Selalu mulai dari [] supaya render pertama di client sama dengan HTML server.
+  // Cache baru dipakai setelah mount (kalau dipakai di useState → hydration mismatch).
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
   useEffect(() => {
-    if (cache) return;
+    if (cache) {
+      setCategories(cache);
+      return;
+    }
     categoryService
       .list()
       .then((r) => {

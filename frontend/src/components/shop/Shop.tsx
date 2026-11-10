@@ -42,6 +42,8 @@ export default function Shop() {
   const availability = sp.get("availability") ?? "";
   const min = sp.get("min") ?? "";
   const max = sp.get("max") ?? "";
+  // ?new=1: "Baru datang" = produk yang dibuat 7 hari terakhir.
+  const fresh = sp.get("new") === "1";
   const page = Math.max(1, Number(sp.get("page")) || 1);
 
   const setParams = (patch: Record<string, string | number | null>, resetPage = true) => {
@@ -64,21 +66,23 @@ export default function Shop() {
         availability_type: availability || undefined,
         min_price: min ? Number(min) : undefined,
         max_price: max ? Number(max) : undefined,
+        new_days: fresh ? 7 : undefined,
         page,
         limit: PAGE_SIZE,
       }),
-    [category, q, sort, availability, min, max, page]
+    [category, q, sort, availability, min, max, fresh, page]
   );
   const banner = useAsync(() => bannerService.live("catalog"), []);
   const catBanner = banner.data?.[0];
 
   const [filterOpen, setFilterOpen] = useState(false);
   const activeCat = categories.find((c) => c.id === category);
-  const title = q ? `“${q}”` : activeCat?.name ?? "Semua produk";
+  const title = q ? `“${q}”` : activeCat?.name ?? (fresh ? "Baru datang" : "Semua produk");
   const total = list.data?.meta.total ?? 0;
 
   const chips = useMemo(() => {
     const out: { key: string; label: string; clear: Record<string, null> }[] = [];
+    if (fresh) out.push({ key: "new", label: "Baru datang · 7 hari", clear: { new: null } });
     if (q) out.push({ key: "q", label: "Cari: " + q, clear: { q: null } });
     if (availability) out.push({ key: "a", label: availability === "preorder" ? "Pre-order" : "Ready stock", clear: { availability: null } });
     if (min || max)
@@ -88,7 +92,7 @@ export default function Shop() {
         clear: { min: null, max: null },
       });
     return out;
-  }, [q, availability, min, max]);
+  }, [fresh, q, availability, min, max]);
 
   return (
     <div className="pb-6">

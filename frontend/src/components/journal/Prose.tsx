@@ -3,7 +3,7 @@ import Link from "next/link";
 import { cdn } from "@/lib/img";
 
 /**
- * Perender Markdown ringan & aman untuk artikel jurnal. Tidak memakai
+ * Perender Markdown ringan & aman untuk artikel News. Tidak memakai
  * dangerouslySetInnerHTML: teks dirender sebagai elemen React, dan hanya
  * tautan http(s)/path internal yang diizinkan.
  *

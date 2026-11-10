@@ -31,8 +31,9 @@ const (
 	apiPrefix = "/api/v1"
 
 	// Batas percobaan login, register, dan ganti password per IP, untuk mempersulit tebak password.
-	authRateLimit  = 10
-	authRateWindow = time.Minute
+	authRateLimit          = 10
+	passwordResetRateLimit = 3
+	authRateWindow         = time.Minute
 
 	// Batas per IP untuk endpoint publik yang sering dipanggil (pengaturan
 	// situs, data wilayah, cek ongkir).
@@ -69,10 +70,10 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 	authenticate := middleware.Authenticate(tokens)
 	requireAdmin := middleware.RequireRole(user.RoleAdmin)
 	// Belanja (keranjang, checkout, pembayaran) hanya untuk akun pelanggan;
-	// admin dan copywriter ditolak di server, bukan hanya disembunyikan di UI.
+	// admin dan staff ditolak di server, bukan hanya disembunyikan di UI.
 	requireCustomer := middleware.RequireRole(user.RoleCustomer)
 	// Pengelola konten jurnal.
-	requireEditor := middleware.RequireRole(user.RoleAdmin, user.RoleCopywriter)
+	requireBackoffice := middleware.RequireRole(user.RoleAdmin, user.RoleStaff)
 	optionalAuthenticate := middleware.AuthenticateOptional(tokens)
 	cache := middleware.NewResponseCache(rdb, publicCacheTTL)
 	cached := cache.Cached()
@@ -85,6 +86,11 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 	mux.Handle("POST "+apiPrefix+"/auth/login",
 		middleware.Chain(http.HandlerFunc(h.auth.Login), middleware.RateLimit(authRateLimit, authRateWindow)))
 
+	// Lupa password: limiter terpisah supaya pengiriman email tidak bisa dibanjiri.
+	mux.Handle("POST "+apiPrefix+"/auth/password/forgot",
+		middleware.Chain(http.HandlerFunc(h.auth.ForgotPassword), middleware.RateLimit(passwordResetRateLimit, authRateWindow)))
+	mux.Handle("POST "+apiPrefix+"/auth/password/reset",
+		middleware.Chain(http.HandlerFunc(h.auth.ResetPassword), middleware.RateLimit(authRateLimit, authRateWindow)))
 	mux.Handle("POST "+apiPrefix+"/auth/verify-email",
 		middleware.Chain(http.HandlerFunc(h.auth.VerifyEmail), middleware.RateLimit(authRateLimit, authRateWindow)))
 	mux.Handle("POST "+apiPrefix+"/auth/verification/resend",
@@ -105,11 +111,11 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 	mux.Handle("GET "+apiPrefix+"/categories/{categoryId}",
 		middleware.Chain(http.HandlerFunc(h.category.Get), cached, optionalAuthenticate))
 	mux.Handle("POST "+apiPrefix+"/categories",
-		middleware.Chain(http.HandlerFunc(h.category.Create), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.category.Create), authenticate, requireBackoffice))
 	mux.Handle("PATCH "+apiPrefix+"/categories/{categoryId}",
-		middleware.Chain(http.HandlerFunc(h.category.Update), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.category.Update), authenticate, requireBackoffice))
 	mux.Handle("DELETE "+apiPrefix+"/categories/{categoryId}",
-		middleware.Chain(http.HandlerFunc(h.category.Delete), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.category.Delete), authenticate, requireBackoffice))
 
 	// Publik; admin dikenali lewat token opsional (lihat parameter status).
 	mux.Handle("GET "+apiPrefix+"/products",
@@ -117,11 +123,11 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 	mux.Handle("GET "+apiPrefix+"/products/{productId}",
 		middleware.Chain(http.HandlerFunc(h.product.Get), cached, optionalAuthenticate))
 	mux.Handle("POST "+apiPrefix+"/products",
-		middleware.Chain(http.HandlerFunc(h.product.Create), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.product.Create), authenticate, requireBackoffice))
 	mux.Handle("PATCH "+apiPrefix+"/products/{productId}",
-		middleware.Chain(http.HandlerFunc(h.product.Update), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.product.Update), authenticate, requireBackoffice))
 	mux.Handle("DELETE "+apiPrefix+"/products/{productId}",
-		middleware.Chain(http.HandlerFunc(h.product.Delete), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.product.Delete), authenticate, requireBackoffice))
 
 	// Keranjang selalu milik user yang sedang login (lihat token).
 	mux.Handle("GET "+apiPrefix+"/cart",
@@ -144,31 +150,31 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 
 	// Varian dan gambar produk (admin).
 	mux.Handle("POST "+apiPrefix+"/products/{productId}/variants",
-		middleware.Chain(http.HandlerFunc(h.product.CreateVariant), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.product.CreateVariant), authenticate, requireBackoffice))
 	mux.Handle("PATCH "+apiPrefix+"/products/{productId}/variants/{variantId}",
-		middleware.Chain(http.HandlerFunc(h.product.UpdateVariant), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.product.UpdateVariant), authenticate, requireBackoffice))
 	mux.Handle("DELETE "+apiPrefix+"/products/{productId}/variants/{variantId}",
-		middleware.Chain(http.HandlerFunc(h.product.DeleteVariant), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.product.DeleteVariant), authenticate, requireBackoffice))
 	mux.Handle("POST "+apiPrefix+"/products/{productId}/images",
-		middleware.Chain(http.HandlerFunc(h.product.CreateImage), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.product.CreateImage), authenticate, requireBackoffice))
 	mux.Handle("PATCH "+apiPrefix+"/products/{productId}/images/{imageId}",
-		middleware.Chain(http.HandlerFunc(h.product.UpdateImage), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.product.UpdateImage), authenticate, requireBackoffice))
 	mux.Handle("DELETE "+apiPrefix+"/products/{productId}/images/{imageId}",
-		middleware.Chain(http.HandlerFunc(h.product.DeleteImage), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.product.DeleteImage), authenticate, requireBackoffice))
 
 	// Unggah gambar ke Cloudinary; URL hasilnya dipakai untuk image_url (admin).
 	mux.Handle("POST "+apiPrefix+"/admin/uploads/images",
-		middleware.Chain(http.HandlerFunc(h.upload.Image), authenticate, requireEditor))
+		middleware.Chain(http.HandlerFunc(h.upload.Image), authenticate, requireBackoffice))
 
 	// Banner: publik, admin dikenali lewat token opsional (include_inactive).
 	mux.Handle("GET "+apiPrefix+"/banners",
 		middleware.Chain(http.HandlerFunc(h.banner.List), cached, optionalAuthenticate))
 	mux.Handle("POST "+apiPrefix+"/banners",
-		middleware.Chain(http.HandlerFunc(h.banner.Create), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.banner.Create), authenticate, requireBackoffice))
 	mux.Handle("PATCH "+apiPrefix+"/banners/{bannerId}",
-		middleware.Chain(http.HandlerFunc(h.banner.Update), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.banner.Update), authenticate, requireBackoffice))
 	mux.Handle("DELETE "+apiPrefix+"/banners/{bannerId}",
-		middleware.Chain(http.HandlerFunc(h.banner.Delete), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.banner.Delete), authenticate, requireBackoffice))
 
 	// Pengaturan situs (mode maintenance).
 	mux.Handle("GET "+apiPrefix+"/site-settings",
@@ -205,11 +211,13 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 	mux.Handle("GET "+apiPrefix+"/orders/{orderId}",
 		middleware.Chain(http.HandlerFunc(h.order.Get), authenticate))
 	mux.Handle("GET "+apiPrefix+"/admin/summary",
-		middleware.Chain(http.HandlerFunc(h.order.AdminSummary), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.order.AdminSummary), authenticate, requireBackoffice))
+	mux.Handle("GET "+apiPrefix+"/admin/analytics",
+		middleware.Chain(http.HandlerFunc(h.order.AdminAnalytics), authenticate, requireAdmin))
 	mux.Handle("GET "+apiPrefix+"/admin/orders",
-		middleware.Chain(http.HandlerFunc(h.order.AdminList), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.order.AdminList), authenticate, requireBackoffice))
 	mux.Handle("PUT "+apiPrefix+"/admin/orders/{orderId}/status",
-		middleware.Chain(http.HandlerFunc(h.order.AdminUpdateStatus), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.order.AdminUpdateStatus), authenticate, requireBackoffice))
 
 	// Pembayaran: pemilik order membuat tagihan & unggah bukti; admin memverifikasi.
 	mux.Handle("GET "+apiPrefix+"/orders/{orderId}/payment",
@@ -221,32 +229,32 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 	mux.Handle("PUT "+apiPrefix+"/orders/{orderId}/payment/proof",
 		middleware.Chain(http.HandlerFunc(h.payment.UploadProof), authenticate, requireCustomer))
 	mux.Handle("GET "+apiPrefix+"/admin/payments",
-		middleware.Chain(http.HandlerFunc(h.payment.AdminList), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.payment.AdminList), authenticate, requireBackoffice))
 	mux.Handle("POST "+apiPrefix+"/admin/payments/{paymentId}/review",
-		middleware.Chain(http.HandlerFunc(h.payment.AdminReview), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.payment.AdminReview), authenticate, requireBackoffice))
 
 	// Pengiriman: dibaca pemilik order/admin, diisi admin.
 	mux.Handle("GET "+apiPrefix+"/orders/{orderId}/shipment",
 		middleware.Chain(http.HandlerFunc(h.shipment.Get), authenticate))
 	mux.Handle("PUT "+apiPrefix+"/orders/{orderId}/shipment",
-		middleware.Chain(http.HandlerFunc(h.shipment.Upsert), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.shipment.Upsert), authenticate, requireBackoffice))
 
-	// Jurnal: publik membaca artikel terbit (di-cache); admin & copywriter
+	// Jurnal: publik membaca artikel terbit (di-cache); admin & staff
 	// mengelola semua artikel.
 	mux.Handle("GET "+apiPrefix+"/posts",
 		middleware.Chain(http.HandlerFunc(h.post.PublicList), cached))
 	mux.Handle("GET "+apiPrefix+"/posts/{slug}",
 		middleware.Chain(http.HandlerFunc(h.post.PublicGet), cached))
 	mux.Handle("GET "+apiPrefix+"/admin/posts",
-		middleware.Chain(http.HandlerFunc(h.post.AdminList), authenticate, requireEditor))
+		middleware.Chain(http.HandlerFunc(h.post.AdminList), authenticate, requireBackoffice))
 	mux.Handle("POST "+apiPrefix+"/admin/posts",
-		middleware.Chain(http.HandlerFunc(h.post.Create), authenticate, requireEditor))
+		middleware.Chain(http.HandlerFunc(h.post.Create), authenticate, requireBackoffice))
 	mux.Handle("GET "+apiPrefix+"/admin/posts/{postId}",
-		middleware.Chain(http.HandlerFunc(h.post.AdminGet), authenticate, requireEditor))
+		middleware.Chain(http.HandlerFunc(h.post.AdminGet), authenticate, requireBackoffice))
 	mux.Handle("PATCH "+apiPrefix+"/admin/posts/{postId}",
-		middleware.Chain(http.HandlerFunc(h.post.Update), authenticate, requireEditor))
+		middleware.Chain(http.HandlerFunc(h.post.Update), authenticate, requireBackoffice))
 	mux.Handle("DELETE "+apiPrefix+"/admin/posts/{postId}",
-		middleware.Chain(http.HandlerFunc(h.post.Delete), authenticate, requireEditor))
+		middleware.Chain(http.HandlerFunc(h.post.Delete), authenticate, requireBackoffice))
 
 	// Semua yang tidak cocok dijawab dengan format error yang sama.
 	mux.HandleFunc("/", notFound)

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -235,6 +236,13 @@ func parseFilter(r *http.Request) (Filter, string) {
 		MaxPrice:         q.Get("max_price"),
 		Sort:             q.Get("sort"),
 	}
+	if v := q.Get("new_days"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 90 {
+			return f, "Parameter new_days harus 1 sampai 90."
+		}
+		f.NewDays = n
+	}
 	switch {
 	case utf8.RuneCountInString(f.Query) > 100:
 		return f, "Parameter q maksimal 100 karakter."
@@ -321,7 +329,7 @@ func validStatus(s string) bool {
 
 func isAdmin(r *http.Request) bool {
 	p, ok := middleware.PrincipalFrom(r.Context())
-	return ok && p.Role == user.RoleAdmin
+	return ok && user.IsBackoffice(p.Role)
 }
 
 func notFound(w http.ResponseWriter) {

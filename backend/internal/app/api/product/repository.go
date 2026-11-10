@@ -88,6 +88,9 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]P
 	if f.MaxPrice != "" {
 		add("price <= $%d::numeric", f.MaxPrice)
 	}
+	if f.NewDays > 0 {
+		add("created_at >= now() - make_interval(days => $%d::int)", f.NewDays)
+	}
 	where := ""
 	if len(conds) > 0 {
 		where = " WHERE " + strings.Join(conds, " AND ")

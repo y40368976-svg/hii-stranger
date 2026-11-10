@@ -95,9 +95,11 @@ export default function OrderDetail() {
         </Badge>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-line bg-white p-4 md:p-5">
-        <OrderStepper order={o} />
-      </div>
+      {o.order_status !== "cancelled" && (
+        <div className="mt-6 rounded-2xl border border-line bg-white p-4 md:p-5">
+          <OrderStepper order={o} />
+        </div>
+      )}
 
       <div className="mt-6 grid *:min-w-0 gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-6">
@@ -107,10 +109,7 @@ export default function OrderDetail() {
           {o.order_status === "cancelled" && (
             <div className="flex items-start gap-3 rounded-2xl border border-danger/20 bg-danger-soft p-5">
               <XCircle className="mt-0.5 size-5 shrink-0 text-danger" />
-              <div className="text-sm">
-                <p className="font-semibold">Pesanan dibatalkan</p>
-                <p className="mt-1 text-ink-3">{o.cancel_reason ?? "Pesanan ini sudah dibatalkan."} Stok sudah dikembalikan.</p>
-              </div>
+              <p className="text-sm font-semibold">Pesanan dibatalkan</p>
             </div>
           )}
           {(o.order_status === "paid" || o.order_status === "processing") && (

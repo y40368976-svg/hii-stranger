@@ -261,3 +261,63 @@ func wrap(op string, err error) error {
 	}
 	return fmt.Errorf("user: %s: %w", op, err)
 }
+
+// SavePasswordReset menyimpan hash token reset password baru dan menghapus
+// token lama user, sehingga hanya tautan terbaru yang berlaku.
+func (r *Repository) SavePasswordReset(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return wrap("save password reset begin", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `DELETE FROM password_resets WHERE user_id = $1`, userID); err != nil {
+		return wrap("save password reset clear", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, $3)`,
+		tokenHash, userID, expiresAt); err != nil {
+		return wrap("save password reset insert", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return wrap("save password reset commit", err)
+	}
+	return nil
+}
+
+// ConsumePasswordReset mengganti password bila token masih berlaku lalu
+// menghapus semua token reset user (sekali pakai). Karena tautan dikirim ke
+// email, keberhasilan reset sekaligus membuktikan kepemilikan email.
+func (r *Repository) ConsumePasswordReset(ctx context.Context, tokenHash, passwordHash string) (User, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return User{}, wrap("consume password reset begin", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var userID string
+	err = tx.QueryRow(ctx,
+		`DELETE FROM password_resets
+		  WHERE token_hash = $1 AND expires_at > now()
+		  RETURNING user_id`, tokenHash).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrInvalidPasswordReset
+	}
+	if err != nil {
+		return User{}, wrap("consume password reset", err)
+	}
+	u, err := scanUser(tx.QueryRow(ctx,
+		`UPDATE users SET password_hash = $2, email_verified_at = COALESCE(email_verified_at, now())
+		  WHERE id = $1
+		  RETURNING `+userColumns, userID, passwordHash))
+	if err != nil {
+		return User{}, wrap("consume password reset update", err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM password_resets WHERE user_id = $1`, userID); err != nil {
+		return User{}, wrap("consume password reset cleanup", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return User{}, wrap("consume password reset commit", err)
+	}
+	return u, nil
+}

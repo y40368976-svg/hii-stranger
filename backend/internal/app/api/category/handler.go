@@ -203,7 +203,7 @@ func (req updateRequest) changes() (Changes, []response.FieldError) {
 
 func isAdmin(r *http.Request) bool {
 	p, ok := middleware.PrincipalFrom(r.Context())
-	return ok && p.Role == user.RoleAdmin
+	return ok && user.IsBackoffice(p.Role)
 }
 
 func notFound(w http.ResponseWriter) {

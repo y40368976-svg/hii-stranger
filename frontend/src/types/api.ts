@@ -2,7 +2,7 @@
 export type ApiMeta = { page: number; limit: number; total: number };
 export type Paginated<T> = { data: T[]; meta: ApiMeta };
 
-export type Role = "customer" | "admin" | "copywriter";
+export type Role = "customer" | "admin" | "staff";
 
 export type ApiUser = {
   id: string;
@@ -221,6 +221,24 @@ export type ApiSummary = {
     stock: number;
   }[];
   recent: ApiOrderListItem[];
+};
+
+export type ApiAnalyticsTotals = {
+  revenue: string;
+  paid_orders: number;
+  all_orders: number;
+  cancelled: number;
+  buyers: number;
+  items_sold: number;
+};
+
+export type ApiAnalytics = {
+  days: 7 | 30 | 90;
+  current: ApiAnalyticsTotals;
+  previous: ApiAnalyticsTotals;
+  series: { date: string; revenue: string; orders: number }[];
+  top_products: { product_id: string; name: string; quantity: number; revenue: string }[];
+  statuses: Partial<Record<OrderStatus, number>>;
 };
 
 /** Item wilayah dari RajaOngkir (provinsi/kota/kecamatan/kelurahan). */

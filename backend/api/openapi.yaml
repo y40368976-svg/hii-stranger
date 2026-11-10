@@ -21,11 +21,11 @@ info:
       Detail internal (stack trace, SQL, secret) tidak pernah dikirim ke client.
     - Autentikasi memakai header `Authorization: Bearer <JWT>`. `user_id` dan `role` selalu diambil dari token,
       tidak pernah dari body request.
-    - Peran: `public` (tanpa token), `customer`, `copywriter`, dan `admin`. Role dibaca dari token,
+    - Peran: `public` (tanpa token), `customer`, `staff`, dan `admin`. Role dibaca dari token,
       jadi perubahan role berlaku setelah user login ulang.
       - `customer`: satu-satunya role yang boleh memakai keranjang, cek ongkir, checkout, membuat tagihan,
-        dan mengunggah bukti bayar. Admin/copywriter ditolak 403 (ditegakkan di server).
-      - `copywriter`: hanya mengelola jurnal (`/admin/posts`) dan unggah gambar.
+        dan mengunggah bukti bayar. Admin/staff ditolak 403 (ditegakkan di server).
+      - `staff`: mengelola katalog, banner, pesanan, pembayaran, pengiriman, dan jurnal. Pengaturan toko dan pengguna hanya `admin`.
       - `admin`: seluruh endpoint admin, tetapi tidak dapat berbelanja.
       Resource milik user (cart, order, payment, shipment) hanya bisa diakses pemiliknya atau admin.
     - Checkout mewajibkan email terverifikasi (`email_verified_at` terisi); bila belum, server menjawab
@@ -68,11 +68,11 @@ tags:
   - name: Banners
     description: Banner kampanye/event terjadwal (hero, utama, katalog).
   - name: Journal
-    description: Artikel jurnal/blog. Publik membaca artikel terbit; admin & copywriter mengelola.
+    description: Artikel jurnal/blog. Publik membaca artikel terbit; admin & staff mengelola.
   - name: Admin
     description: Dashboard ringkasan operasional.
   - name: Uploads
-    description: Unggah gambar ke Cloudinary (admin & copywriter).
+    description: Unggah gambar ke Cloudinary (admin & staff).
   - name: Site Settings
     description: Pengaturan situs, termasuk mode maintenance.
   - name: Shipping
@@ -848,7 +848,7 @@ paths:
       operationId: adminUploadImage
       summary: Unggah gambar ke Cloudinary
       description: |
-        Hak akses: admin, copywriter. Menyimpan gambar (JPEG, PNG, atau WebP, maksimal 5 MB) ke Cloudinary dan
+        Hak akses: admin, staff. Menyimpan gambar (JPEG, PNG, atau WebP, maksimal 5 MB) ke Cloudinary dan
         mengembalikan URL https-nya. URL tersebut lalu dikirim sebagai `image_url` ke
         `POST /products/{productId}/images` atau `POST /banners`. Tipe diperiksa dari isi berkas.
         Bila kredensial Cloudinary belum diisi di server, hasilnya 503.
@@ -1175,7 +1175,7 @@ paths:
       operationId: getShippingCosts
       summary: Cek ongkir isi keranjang ke kelurahan tujuan
       description: |
-        Hak akses: customer (admin/copywriter 403). Berat paket dihitung server dari keranjang (berat produk x jumlah).
+        Hak akses: customer (admin/staff 403). Berat paket dihitung server dari keranjang (berat produk x jumlah).
         Asal pengiriman adalah kelurahan toko. Kurir ditentukan toko (saat ini POS Indonesia) dan layanan
         termurahnya dipakai otomatis; pelanggan tidak memilih kurir. Nilai ini sama dengan ongkir saat checkout.
       parameters:
@@ -1220,7 +1220,7 @@ paths:
       tags: [Cart]
       operationId: getCart
       summary: Isi keranjang milik user
-      description: "Hak akses: customer (keranjang miliknya sendiri). Admin/copywriter ditolak 403."
+      description: "Hak akses: customer (keranjang miliknya sendiri). Admin/staff ditolak 403."
       responses:
         "200":
           description: Isi keranjang.
@@ -1241,7 +1241,7 @@ paths:
       operationId: addCartItem
       summary: Tambah item ke keranjang
       description: |
-        Hak akses: customer (admin/copywriter 403). Produk nonaktif ditolak seperti varian yang tidak ada (404). Database tidak membatasi satu varian per user, jadi aplikasi menggabungkan:
+        Hak akses: customer (admin/staff 403). Produk nonaktif ditolak seperti varian yang tidak ada (404). Database tidak membatasi satu varian per user, jadi aplikasi menggabungkan:
         bila varian sudah ada di keranjang, jumlahnya ditambah. Total jumlah tidak boleh melebihi stok varian.
       requestBody:
         required: true
@@ -1355,7 +1355,7 @@ paths:
       operationId: createOrder
       summary: Checkout dari keranjang
       description: |
-        Hak akses: customer dengan email terverifikasi. Admin/copywriter → 403 `forbidden`; email belum
+        Hak akses: customer dengan email terverifikasi. Admin/staff → 403 `forbidden`; email belum
         terverifikasi → 403 `email_not_verified`. Server menghitung `subtotal`, `shipping_cost`, dan
         `total_amount`; nilai tersebut tidak diterima dari client. Seluruh proses (cek role & verifikasi,
         cek stok, buat order dan item, buat tagihan QRIS, kurangi stok, kosongkan item keranjang yang
@@ -1974,7 +1974,7 @@ paths:
       tags: [Journal]
       operationId: adminListPosts
       summary: Semua artikel (semua status)
-      description: "Hak akses: admin, copywriter. Diurutkan dari yang terakhir diubah."
+      description: "Hak akses: admin, staff. Diurutkan dari yang terakhir diubah."
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/Limit"
@@ -2008,7 +2008,7 @@ paths:
       operationId: createPost
       summary: Buat artikel
       description: |
-        Hak akses: admin, copywriter. Penulis diambil dari token. Default status `draft`. Status `published`
+        Hak akses: admin, staff. Penulis diambil dari token. Default status `draft`. Status `published`
         tanpa `published_at` memakai waktu server. Slug harus unik (409).
       requestBody:
         required: true
@@ -2048,7 +2048,7 @@ paths:
       tags: [Journal]
       operationId: adminGetPost
       summary: Detail artikel (semua status)
-      description: "Hak akses: admin, copywriter."
+      description: "Hak akses: admin, staff."
       responses:
         "200":
           description: Artikel.
@@ -2068,7 +2068,7 @@ paths:
       tags: [Journal]
       operationId: updatePost
       summary: Ubah artikel
-      description: "Hak akses: admin, copywriter. Field yang tidak dikirim tidak berubah; `product_ids` mengganti seluruh daftar."
+      description: "Hak akses: admin, staff. Field yang tidak dikirim tidak berubah; `product_ids` mengganti seluruh daftar."
       requestBody:
         required: true
         content:
@@ -2100,7 +2100,7 @@ paths:
       tags: [Journal]
       operationId: deletePost
       summary: Hapus artikel
-      description: "Hak akses: admin, copywriter. Permanen; gunakan status `archived` untuk menyembunyikan."
+      description: "Hak akses: admin, staff. Permanen; gunakan status `archived` untuk menyembunyikan."
       responses:
         "204":
           description: Dihapus.
@@ -3583,7 +3583,7 @@ components:
     # ---------------------------------------------------- Role, admin, jurnal
     Role:
       type: string
-      enum: [customer, copywriter, admin]
+      enum: [customer, staff, admin]
 
     VerifyEmailRequest:
       type: object

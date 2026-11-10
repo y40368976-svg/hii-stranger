@@ -270,7 +270,7 @@ func (req adminUpdateRequest) changes() (AdminChanges, []response.FieldError) {
 
 	if req.Role != nil {
 		role := strings.TrimSpace(*req.Role)
-		c.Check(slices.Contains([]string{RoleCustomer, RoleAdmin, RoleCopywriter}, role), "role", "Role harus customer, admin, atau copywriter.")
+		c.Check(slices.Contains([]string{RoleCustomer, RoleAdmin, RoleStaff}, role), "role", "Role harus customer, admin, atau staff.")
 		out.Role = &role
 	}
 	if req.Status != nil {

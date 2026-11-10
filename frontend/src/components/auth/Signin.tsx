@@ -15,7 +15,7 @@ export function safeNext(v: string | null) {
 }
 
 export default function Signin() {
-  const { login, user, loading, isStaff, isCopywriter } = useAuth();
+  const { login, user, loading, isStaff } = useAuth();
   const router = useRouter();
   const next = safeNext(useSearchParams().get("next"));
   const [email, setEmail] = useState("");
@@ -25,8 +25,8 @@ export default function Signin() {
 
   useEffect(() => {
     if (loading || !user) return;
-    router.replace(isStaff ? (isCopywriter ? "/admin?tab=journal" : "/admin") : next ?? "/");
-  }, [loading, user, isStaff, isCopywriter, next, router]);
+    router.replace(isStaff ? "/admin" : next ?? "/");
+  }, [loading, user, isStaff, next, router]);
 
   return (
     <AuthShell eyebrow="Masuk" title="Selamat datang lagi" aside="Pantau pesanan, simpan tas belanja di semua perangkat, dan terima resi lewat email.">
@@ -53,6 +53,11 @@ export default function Signin() {
         <Field label="Password">
           {(id) => <PasswordInput id={id} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />}
         </Field>
+        <div className="-mt-1 flex justify-end">
+          <Link href={"/forgot-password" + (email.trim() ? "?email=" + encodeURIComponent(email.trim()) : "")} className="text-[13px] font-semibold text-ink-3 underline underline-offset-4 hover:text-ink">
+            Lupa password?
+          </Link>
+        </div>
         {error && <p className="rounded-xl bg-danger-soft px-3 py-2.5 text-[13px] font-medium text-danger">{error}</p>}
         <Button type="submit" variant="dark" size="lg" block loading={busy} disabled={!email || !password}>
           Masuk

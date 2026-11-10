@@ -172,3 +172,65 @@ func (h *Handler) ResendVerification(w http.ResponseWriter, r *http.Request) {
 		response.NoContent(w)
 	}
 }
+
+type forgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+// ForgotPassword melayani POST /auth/password/forgot (publik). Selalu 204
+// untuk email berformat valid, terdaftar atau tidak.
+func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req forgotPasswordRequest
+	if !response.Decode(w, r, &req) {
+		return
+	}
+	req.Email = normalizeEmail(req.Email)
+	if !validator.Email(req.Email) {
+		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.",
+			response.FieldError{Field: "email", Message: "Format email tidak valid."})
+		return
+	}
+	if err := h.svc.RequestPasswordReset(r.Context(), req.Email); err != nil {
+		slog.ErrorContext(r.Context(), "request password reset failed", "error", err)
+		response.Internal(w)
+		return
+	}
+	response.NoContent(w)
+}
+
+type resetPasswordRequest struct {
+	Token    string `json:"token"`
+	Password string `json:"password"`
+}
+
+func validateResetPassword(req resetPasswordRequest) []response.FieldError {
+	var c validator.Collector
+	c.Check(validator.ByteLenBetween(req.Token, 20, 200), "token", "Tautan reset tidak valid.")
+	// Batas 72 byte berasal dari algoritma bcrypt.
+	c.Check(validator.ByteLenBetween(req.Password, 8, 72), "password", "Password harus 8 sampai 72 karakter.")
+	return c.Errors()
+}
+
+// ResetPassword melayani POST /auth/password/reset (publik).
+func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req resetPasswordRequest
+	if !response.Decode(w, r, &req) {
+		return
+	}
+	req.Token = strings.TrimSpace(req.Token)
+	if errs := validateResetPassword(req); len(errs) > 0 {
+		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		return
+	}
+	err := h.svc.ResetPassword(r.Context(), req.Token, req.Password)
+	switch {
+	case errors.Is(err, user.ErrInvalidPasswordReset):
+		response.Error(w, http.StatusGone, "reset_invalid",
+			"Tautan reset tidak valid atau sudah kedaluwarsa. Minta tautan baru dari halaman lupa password.")
+	case err != nil:
+		slog.ErrorContext(r.Context(), "reset password failed", "error", err)
+		response.Internal(w)
+	default:
+		response.NoContent(w)
+	}
+}

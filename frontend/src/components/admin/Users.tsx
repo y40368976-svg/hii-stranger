@@ -14,7 +14,7 @@ import { DesktopOnly, MobileList, PageHeader, Panel, run, Table, td } from "./ki
 
 const ROLES: { value: Role; label: string; description: string }[] = [
   { value: "customer", label: "Pelanggan", description: "Belanja & checkout" },
-  { value: "copywriter", label: "Copywriter", description: "Hanya mengelola Jurnal" },
+  { value: "staff", label: "Staff", description: "Kelola pesanan, pembayaran, katalog, banner & News. Tanpa akses pengaturan toko & pengguna." },
   { value: "admin", label: "Admin", description: "Akses penuh panel, tidak bisa belanja" },
 ];
 
@@ -61,7 +61,7 @@ export default function AdminUsers() {
     <div>
       <PageHeader
         title="Pengguna & role"
-        description="Admin dan copywriter adalah akun staf: tidak bisa berbelanja. Perubahan role berlaku setelah pengguna masuk ulang."
+        description="Admin dan staff adalah akun back-office: tidak bisa berbelanja. Perubahan role berlaku setelah pengguna masuk ulang."
       />
       <Panel>
         <div className="flex flex-col gap-3 border-b border-line p-4 md:flex-row md:items-center">
