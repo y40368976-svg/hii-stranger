@@ -1,0 +1,85 @@
+[
+  {
+    "label": "backend: vet",
+    "command": "make vet 2>&1 | tail -20",
+    "cwd": "$ZED_WORKTREE_ROOT/backend",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "backend: test (hanya gagal)",
+    "command": "go test ./... 2>&1 | grep -Ev '^(ok|\\?)\\s' | tail -30",
+    "cwd": "$ZED_WORKTREE_ROOT/backend",
+    "reveal": "always"
+  },
+  {
+    "label": "backend: lint (golangci-lint)",
+    "command": "golangci-lint run ./... 2>&1 | tail -25",
+    "cwd": "$ZED_WORKTREE_ROOT/backend",
+    "reveal": "always"
+  },
+  {
+    "label": "frontend: dev server",
+    "command": "pnpm dev",
+    "cwd": "$ZED_WORKTREE_ROOT/frontend",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "frontend: lint",
+    "command": "pnpm lint 2>&1 | tail -25",
+    "cwd": "$ZED_WORKTREE_ROOT/frontend",
+    "reveal": "always"
+  },
+  {
+    "label": "frontend: typecheck",
+    "command": "pnpm exec tsc --noEmit 2>&1 | grep -E 'error TS' | head -20",
+    "cwd": "$ZED_WORKTREE_ROOT/frontend",
+    "reveal": "always"
+  },
+  {
+    "label": "backend: run API",
+    "command": "go run ./cmd/api",
+    "cwd": "$ZED_WORKTREE_ROOT/backend",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "backend: test package file ini",
+    "command": "go test -count=1 . 2>&1 | tail -30",
+    "cwd": "$ZED_DIRNAME",
+    "reveal": "always"
+  },
+  {
+    "label": "backend: test -race",
+    "command": "make test-race 2>&1 | grep -Ev '^(ok|\\?)\\s' | tail -30",
+    "cwd": "$ZED_WORKTREE_ROOT/backend",
+    "reveal": "always"
+  },
+  {
+    "label": "backend: fmt",
+    "command": "make fmt 2>&1 | tail -10",
+    "cwd": "$ZED_WORKTREE_ROOT/backend",
+    "reveal": "always"
+  },
+  {
+    "label": "frontend: build",
+    "command": "pnpm build 2>&1 | tail -25",
+    "cwd": "$ZED_WORKTREE_ROOT/frontend",
+    "reveal": "always"
+  },
+  {
+    "label": "CEK SEMUA (vet+test+lint+tsc)",
+    "command": "(cd backend && make vet 2>&1 | tail -20; go test ./... 2>&1 | grep -Ev '^(ok|\\?)\\s' | tail -30) ; (cd frontend && pnpm lint 2>&1 | tail -25; pnpm exec tsc --noEmit 2>&1 | grep -E 'error TS' | head -20); echo SELESAI",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always"
+  },
+  {
+    "label": "git: status ringkas",
+    "command": "git status -sb | head -30; echo --- backend repo; git -C backend status -sb | head -20",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always"
+  }
+]

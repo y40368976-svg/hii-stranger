@@ -1,0 +1,32 @@
+[
+  {
+    "label": "Debug backend API",
+    "adapter": "Delve",
+    "request": "launch",
+    "mode": "debug",
+    "program": "$ZED_WORKTREE_ROOT/backend/cmd/api",
+    "cwd": "$ZED_WORKTREE_ROOT/backend"
+  },
+  {
+    "label": "Debug test di folder file ini",
+    "adapter": "Delve",
+    "request": "launch",
+    "mode": "test",
+    "program": "$ZED_DIRNAME",
+    "cwd": "$ZED_DIRNAME"
+  },
+  {
+    "label": "Debug frontend (Next, Node)",
+    "adapter": "JavaScript",
+    "type": "pwa-node",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/frontend/node_modules/next/dist/bin/next",
+    "args": [
+      "dev"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT/frontend",
+    "env": {
+      "NODE_OPTIONS": "--inspect"
+    }
+  }
+]
