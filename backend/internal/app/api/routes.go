@@ -68,12 +68,12 @@ type handlers struct {
 // didaftarkan di sini; rute yang butuh login dibungkus authenticate.
 func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.Client) http.Handler {
 	authenticate := middleware.Authenticate(tokens)
-	requireAdmin := middleware.RequireRole(user.RoleAdmin)
+	requireOwner := middleware.RequireRole(user.RoleOwner)
 	// Belanja (keranjang, checkout, pembayaran) hanya untuk akun pelanggan;
 	// admin dan staff ditolak di server, bukan hanya disembunyikan di UI.
 	requireCustomer := middleware.RequireRole(user.RoleCustomer)
 	// Pengelola konten jurnal.
-	requireBackoffice := middleware.RequireRole(user.RoleAdmin, user.RoleStaff)
+	requireBackoffice := middleware.RequireRole(user.RoleOwner, user.RoleStaff)
 	optionalAuthenticate := middleware.AuthenticateOptional(tokens)
 	cache := middleware.NewResponseCache(rdb, publicCacheTTL)
 	cached := cache.Cached()
@@ -142,11 +142,11 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 		middleware.Chain(http.HandlerFunc(h.cart.Delete), authenticate, requireCustomer))
 
 	mux.Handle("GET "+apiPrefix+"/admin/users",
-		middleware.Chain(http.HandlerFunc(h.user.AdminList), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.user.AdminList), authenticate, requireOwner))
 	mux.Handle("GET "+apiPrefix+"/admin/users/{userId}",
-		middleware.Chain(http.HandlerFunc(h.user.AdminGet), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.user.AdminGet), authenticate, requireOwner))
 	mux.Handle("PATCH "+apiPrefix+"/admin/users/{userId}",
-		middleware.Chain(http.HandlerFunc(h.user.AdminUpdate), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.user.AdminUpdate), authenticate, requireOwner))
 
 	// Varian dan gambar produk (admin).
 	mux.Handle("POST "+apiPrefix+"/products/{productId}/variants",
@@ -180,7 +180,7 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 	mux.Handle("GET "+apiPrefix+"/site-settings",
 		middleware.Chain(http.HandlerFunc(h.siteSetting.Get), middleware.RateLimit(publicRateLimit, publicRateWindow), cached))
 	mux.Handle("PUT "+apiPrefix+"/site-settings",
-		middleware.Chain(http.HandlerFunc(h.siteSetting.Update), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.siteSetting.Update), authenticate, requireOwner))
 
 	// Wilayah berjenjang untuk dropdown alamat (publik, di-cache) dan cek
 	// ongkir sampai kelurahan berdasarkan berat keranjang (login).
@@ -213,7 +213,7 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 	mux.Handle("GET "+apiPrefix+"/admin/summary",
 		middleware.Chain(http.HandlerFunc(h.order.AdminSummary), authenticate, requireBackoffice))
 	mux.Handle("GET "+apiPrefix+"/admin/analytics",
-		middleware.Chain(http.HandlerFunc(h.order.AdminAnalytics), authenticate, requireAdmin))
+		middleware.Chain(http.HandlerFunc(h.order.AdminAnalytics), authenticate, requireOwner))
 	mux.Handle("GET "+apiPrefix+"/admin/orders",
 		middleware.Chain(http.HandlerFunc(h.order.AdminList), authenticate, requireBackoffice))
 	mux.Handle("PUT "+apiPrefix+"/admin/orders/{orderId}/status",

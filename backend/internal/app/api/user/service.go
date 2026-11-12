@@ -40,7 +40,7 @@ func (s *Service) List(ctx context.Context, f ListFilter) ([]User, int, error) {
 // target tidak ada.
 func (s *Service) AdminUpdate(ctx context.Context, actorID, targetID string, c AdminChanges) (User, error) {
 	if actorID == targetID {
-		demotes := c.Role != nil && *c.Role != RoleAdmin
+		demotes := c.Role != nil && *c.Role != RoleOwner
 		deactivates := c.Status != nil && *c.Status != StatusActive
 		if demotes || deactivates {
 			return User{}, ErrSelfLockout

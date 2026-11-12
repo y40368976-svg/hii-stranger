@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthState>(() => {
-    const isAdmin = user?.role === "admin";
+    const isAdmin = user?.role === "owner";
     return {
       user,
       loading,

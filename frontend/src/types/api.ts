@@ -2,7 +2,7 @@
 export type ApiMeta = { page: number; limit: number; total: number };
 export type Paginated<T> = { data: T[]; meta: ApiMeta };
 
-export type Role = "customer" | "admin" | "staff";
+export type Role = "customer" | "owner" | "staff";
 
 export type ApiUser = {
   id: string;

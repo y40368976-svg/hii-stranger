@@ -103,7 +103,7 @@ func TestUpdateProfileChanges(t *testing.T) {
 		},
 		{
 			name:     "email role and status are ignored",
-			body:     `{"name":"Lana","email":"x@example.com","role":"admin","status":"inactive"}`,
+			body:     `{"name":"Lana","email":"x@example.com","role":"owner","status":"inactive"}`,
 			wantName: str("Lana"),
 		},
 	}
