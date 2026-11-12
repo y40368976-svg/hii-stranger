@@ -4,7 +4,11 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ApiBanner } from "@/types/api";
-import { BannerLink, BannerPicture, CtaPill } from "@/components/site/BannerVisual";
+import {
+  BannerLink,
+  BannerPicture,
+  CtaPill,
+} from "@/components/site/BannerVisual";
 
 const INTERVAL = 6000;
 
@@ -40,13 +44,16 @@ export function HeroCarousel({ banners }: { banners: ApiBanner[] }) {
           touch.current = null;
         }}
       >
-        <div className="flex transition-transform duration-700 ease-[cubic-bezier(.2,.8,.2,1)]" style={{ transform: `translateX(-${index * 100}%)` }}>
+        <div
+          className="flex transition-transform duration-700 ease-[cubic-bezier(.2,.8,.2,1)]"
+          style={{ transform: `translateX(-${index * 100}%)` }}
+        >
           {banners.map((b, i) => (
             <BannerLink
               key={b.id}
               href={b.link_url}
               label={b.title ?? undefined}
-              className="group relative block aspect-[4/5] w-full shrink-0 sm:aspect-[16/9] lg:aspect-[12/5]"
+              className="group relative block aspect-4/5 w-full shrink-0 sm:aspect-video lg:aspect-12/5"
             >
               <div aria-hidden={i !== index}>
                 <div className="absolute inset-0">
@@ -57,7 +64,9 @@ export function HeroCarousel({ banners }: { banners: ApiBanner[] }) {
                     <div className="absolute inset-0 bg-linear-to-t from-ink/85 via-ink/25 to-transparent md:bg-linear-to-r md:from-ink/80 md:via-ink/30" />
                     <div className="absolute inset-x-0 bottom-0 flex flex-col gap-3 p-5 md:bottom-auto md:top-1/2 md:max-w-xl md:-translate-y-1/2 md:p-12">
                       {b.subtitle && (
-                        <span className="caps inline-flex self-start rounded-full bg-lime px-2.5 py-1 text-ink">{b.subtitle}</span>
+                        <span className="caps inline-flex self-start rounded-full bg-lime px-2.5 py-1 text-ink">
+                          {b.subtitle}
+                        </span>
                       )}
                       {b.title && (
                         <h1 className="font-display text-[34px] font-extrabold uppercase leading-[0.95] tracking-tight text-canvas md:text-6xl">
@@ -107,7 +116,10 @@ export function HeroCarousel({ banners }: { banners: ApiBanner[] }) {
               aria-label={`Banner ${i + 1}`}
               aria-current={i === index}
               onClick={() => go(i)}
-              className={cn("h-1.5 rounded-full transition-[width,background-color]", i === index ? "w-6 bg-ink" : "w-1.5 bg-line-strong")}
+              className={cn(
+                "h-1.5 rounded-full transition-[width,background-color]",
+                i === index ? "w-6 bg-ink" : "w-1.5 bg-line-strong",
+              )}
             />
           ))}
         </div>
@@ -122,12 +134,15 @@ export function HeroFallback() {
     <section className="container-x pt-3 md:pt-6">
       <div className="relative overflow-hidden rounded-2xl bg-ink px-6 py-14 text-canvas md:rounded-3xl md:px-14 md:py-24">
         <div className="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full bg-lime/20 blur-3xl" />
-        <p className="caps mb-4 text-lime">Hii Stranger · Heavyweight Streetwear</p>
+        <p className="caps mb-4 text-lime">
+          Hii Stranger · Heavyweight Streetwear
+        </p>
         <h1 className="max-w-3xl font-display text-[40px] font-extrabold uppercase leading-[0.92] tracking-tight md:text-7xl">
           Dibuat tebal. Dirilis terbatas.
         </h1>
         <p className="mt-5 max-w-md text-[15px] text-canvas/70">
-          Siluet oversized, cotton 300+ GSM, dan potongan yang dirancang untuk dipakai lama.
+          Siluet oversized, cotton 300+ GSM, dan potongan yang dirancang untuk
+          dipakai lama.
         </p>
         <Link href="/shop" className="group mt-8 inline-block">
           <CtaPill label="Belanja koleksi" />

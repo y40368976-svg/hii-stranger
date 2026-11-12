@@ -18,13 +18,13 @@ func TestAdminUpdateChanges(t *testing.T) {
 		wantStatus *string
 		wantFields []string
 	}{
-		{name: "role only", body: `{"role":"admin"}`, wantRole: str("admin")},
+		{name: "role only", body: `{"role":"owner"}`, wantRole: str("owner")},
 		{name: "status only", body: `{"status":"inactive"}`, wantStatus: str("inactive")},
 		{name: "both, trimmed", body: `{"role":" customer ","status":" active "}`, wantRole: str("customer"), wantStatus: str("active")},
 		{name: "empty body", body: `{}`, wantFields: []string{"body"}},
 		{name: "null fields are not changes", body: `{"role":null,"status":null}`, wantFields: []string{"body"}},
 		{name: "unknown role", body: `{"role":"superadmin"}`, wantRole: str("superadmin"), wantFields: []string{"role"}},
-		{name: "role is case sensitive", body: `{"role":"Admin"}`, wantRole: str("Admin"), wantFields: []string{"role"}},
+		{name: "role is case sensitive", body: `{"role":"Owner"}`, wantRole: str("Owner"), wantFields: []string{"role"}},
 		{name: "unknown status", body: `{"status":"banned"}`, wantStatus: str("banned"), wantFields: []string{"status"}},
 		{
 			name: "both invalid", body: `{"role":"x","status":"y"}`,
@@ -67,9 +67,9 @@ func TestListFilterWhere(t *testing.T) {
 		{name: "no filter", filter: ListFilter{}, wantSQL: "", wantArgs: nil},
 		{
 			name:     "role and status",
-			filter:   ListFilter{Role: "admin", Status: "inactive"},
+			filter:   ListFilter{Role: "owner", Status: "inactive"},
 			wantSQL:  " WHERE role = $1 AND status = $2",
-			wantArgs: []any{"admin", "inactive"},
+			wantArgs: []any{"owner", "inactive"},
 		},
 		{
 			name:     "search only",
@@ -79,9 +79,9 @@ func TestListFilterWhere(t *testing.T) {
 		},
 		{
 			name:     "search escapes like wildcards and keeps placeholder numbering",
-			filter:   ListFilter{Q: `a_b%`, Role: "admin"},
+			filter:   ListFilter{Q: `a_b%`, Role: "owner"},
 			wantSQL:  ` WHERE (name ILIKE $1 ESCAPE '\' OR email ILIKE $1 ESCAPE '\') AND role = $2`,
-			wantArgs: []any{`%a\_b\%%`, "admin"},
+			wantArgs: []any{`%a\_b\%%`, "owner"},
 		},
 		{
 			name:     "input is never part of the SQL text",

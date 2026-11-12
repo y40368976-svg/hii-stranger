@@ -34,7 +34,7 @@ export function Logo({
       </span>
       {!compact && (
         <span className="whitespace-nowrap font-display text-[19px] font-extrabold uppercase leading-none tracking-[-0.03em]">
-          Hii Stranger
+          {/*Hii Stranger*/}
         </span>
       )}
     </Link>

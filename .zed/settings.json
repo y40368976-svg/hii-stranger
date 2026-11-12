@@ -1,0 +1,33 @@
+{
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/node_modules",
+    "**/.next",
+    "**/dump.rdb",
+    "**/rules-direction",
+    "**/*.tsbuildinfo"
+  ],
+  "languages": {
+    "Go": {
+      "tab_size": 4,
+      "hard_tabs": true,
+      "format_on_save": "on"
+    },
+    "TSX": {
+      "tab_size": 2,
+      "format_on_save": "on"
+    },
+    "TypeScript": {
+      "tab_size": 2,
+      "format_on_save": "on"
+    }
+  },
+  "lsp": {
+    "gopls": {
+      "initialization_options": {
+        "staticcheck": true,
+        "gofumpt": true
+      }
+    }
+  }
+}

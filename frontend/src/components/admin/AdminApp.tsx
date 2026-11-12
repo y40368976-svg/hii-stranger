@@ -48,7 +48,7 @@ type TabKey =
   | "users"
   | "settings";
 
-type Role = "admin" | "staff";
+type Role = "owner" | "staff";
 
 const TABS: {
   key: TabKey;
@@ -62,70 +62,70 @@ const TABS: {
     label: "Ringkasan",
     icon: Gauge,
     group: "Operasional",
-    roles: ["admin", "staff"],
+    roles: ["owner", "staff"],
   },
   {
     key: "analytics",
     label: "Analitik",
     icon: BarChart3,
     group: "Operasional",
-    roles: ["admin"],
+    roles: ["owner"],
   },
   {
     key: "orders",
     label: "Pesanan",
     icon: Package,
     group: "Operasional",
-    roles: ["admin", "staff"],
+    roles: ["owner", "staff"],
   },
   {
     key: "payments",
     label: "Verifikasi bayar",
     icon: CreditCard,
     group: "Operasional",
-    roles: ["admin", "staff"],
+    roles: ["owner", "staff"],
   },
   {
     key: "products",
     label: "Produk & stok",
     icon: Shirt,
     group: "Katalog",
-    roles: ["admin", "staff"],
+    roles: ["owner", "staff"],
   },
   {
     key: "categories",
     label: "Kategori",
     icon: Tags,
     group: "Katalog",
-    roles: ["admin", "staff"],
+    roles: ["owner", "staff"],
   },
   {
     key: "banners",
     label: "Banner & event",
     icon: ImageIcon,
     group: "Konten",
-    roles: ["admin", "staff"],
+    roles: ["owner", "staff"],
   },
   {
     key: "journal",
     label: "News",
     icon: NotebookPen,
     group: "Konten",
-    roles: ["admin", "staff"],
+    roles: ["owner", "staff"],
   },
   {
     key: "users",
     label: "Pelanggan",
     icon: Users,
     group: "Sistem",
-    roles: ["admin"],
+    roles: ["owner"],
   },
   {
     key: "settings",
     label: "Pengaturan",
     icon: Settings,
     group: "Sistem",
-    roles: ["admin"],
+    roles: ["owner"],
   },
 ];
 
@@ -171,7 +171,7 @@ export default function AdminApp() {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  const role: Role | null = isAdmin ? "admin" : isStaff ? "staff" : null;
+  const role: Role | null = isAdmin ? "owner" : isStaff ? "staff" : null;
   const allowed = TABS.filter((t) => role && t.roles.includes(role));
   const requested = sp.get("tab") as TabKey | null;
   const current = allowed.find((t) => t.key === requested) ?? allowed[0];
@@ -292,7 +292,7 @@ export default function AdminApp() {
         </span>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{user.name}</p>
-          <p className="caps text-muted">{role === "admin" ? "Admin" : "Staff"}</p>
+          <p className="caps text-muted">{role === "owner" ? "Owner" : "Staff"}</p>
         </div>
       </div>
       <Link

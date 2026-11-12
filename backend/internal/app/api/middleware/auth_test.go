@@ -19,7 +19,7 @@ func TestRequireRole(t *testing.T) {
 	}{
 		{"no principal", nil, http.StatusUnauthorized, false},
 		{"wrong role", &Principal{UserID: "u1", Role: "customer"}, http.StatusForbidden, false},
-		{"right role", &Principal{UserID: "u1", Role: "admin"}, http.StatusOK, true},
+		{"right role", &Principal{UserID: "u1", Role: "owner"}, http.StatusOK, true},
 		{"second allowed role", &Principal{UserID: "u2", Role: "staff"}, http.StatusOK, true},
 	}
 	for _, tc := range tests {
@@ -35,7 +35,7 @@ func TestRequireRole(t *testing.T) {
 				req = req.WithContext(context.WithValue(req.Context(), principalKey{}, *tc.principal))
 			}
 			rec := httptest.NewRecorder()
-			RequireRole("admin", "staff")(next).ServeHTTP(rec, req)
+			RequireRole("owner", "staff")(next).ServeHTTP(rec, req)
 
 			if rec.Code != tc.wantStatus {
 				t.Errorf("status = %d, want %d", rec.Code, tc.wantStatus)
@@ -49,7 +49,7 @@ func TestRequireRole(t *testing.T) {
 
 func TestAuthenticateOptional(t *testing.T) {
 	tokens := token.NewManager("0123456789abcdef0123456789abcdef", "test-issuer", time.Minute)
-	valid, err := tokens.Issue("u1", "admin")
+	valid, err := tokens.Issue("u1", "owner")
 	if err != nil {
 		t.Fatalf("Issue() error = %v", err)
 	}

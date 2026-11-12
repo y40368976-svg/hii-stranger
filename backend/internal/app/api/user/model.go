@@ -11,7 +11,7 @@ import (
 // tanpa constraint, jadi nilai-nilai ini hanya dijaga oleh aplikasi.
 const (
 	RoleCustomer = "customer"
-	RoleAdmin    = "admin"
+	RoleOwner    = "owner"
 	// RoleStaff mengelola operasional toko (katalog, pesanan, pembayaran,
 	// jurnal) tetapi tidak bisa mengubah pengaturan toko atau pengguna.
 	// Seperti admin, staff tidak bisa belanja.
@@ -125,5 +125,5 @@ func (u User) Response() Response {
 
 // IsBackoffice true untuk akun staf toko (admin atau staff).
 func IsBackoffice(role string) bool {
-	return role == RoleAdmin || role == RoleStaff
+	return role == RoleOwner || role == RoleStaff
 }
