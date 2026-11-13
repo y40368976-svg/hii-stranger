@@ -62,6 +62,7 @@ func New(cfg config.Config, db *pgxpool.Pool, rdb *redis.Client) *Server {
 	ongkirSvc := ongkir.NewService(raja, ongkir.NewRepository(db), cfg.RajaOngkirOriginID, cfg.RajaOngkirCouriers)
 
 	orderSvc := order.NewService(order.NewRepository(db), ongkirSvc, paymentRepo, shipmentRepo, mail)
+	siteSvc := sitesetting.NewService(sitesetting.NewRepository(db))
 	h := handlers{
 		auth:        auth.NewHandler(auth.NewService(userRepo, tokens, mail)),
 		user:        user.NewHandler(user.NewService(userRepo)),
@@ -69,13 +70,17 @@ func New(cfg config.Config, db *pgxpool.Pool, rdb *redis.Client) *Server {
 		product:     product.NewHandler(product.NewService(productRepo)),
 		cart:        cart.NewHandler(cart.NewService(cartRepo)),
 		banner:      banner.NewHandler(banner.NewService(banner.NewRepository(db))),
-		siteSetting: sitesetting.NewHandler(sitesetting.NewService(sitesetting.NewRepository(db))),
+		siteSetting: sitesetting.NewHandler(siteSvc),
 		ongkir:      ongkir.NewHandler(ongkirSvc),
 		order:       order.NewHandler(orderSvc),
-		payment:     payment.NewHandler(payment.NewService(paymentRepo, mail)),
+		payment:     payment.NewHandler(payment.NewService(paymentRepo, mail, cdn)),
 		shipment:    shipment.NewHandler(shipment.NewService(shipmentRepo, mail)),
 		upload:      upload.NewHandler(cdn),
 		post:        post.NewHandler(post.NewService(post.NewRepository(db))),
+		maintenance: func(ctx context.Context) (bool, string, error) {
+			s, err := siteSvc.Get(ctx)
+			return s.MaintenanceMode, s.MaintenanceMessage, err
+		},
 	}
 
 	if !mail.Enabled() {
@@ -85,7 +90,7 @@ func New(cfg config.Config, db *pgxpool.Pool, rdb *redis.Client) *Server {
 		slog.Warn("RAJAONGKIR_API_KEY / RAJAONGKIR_ORIGIN_ID kosong: cek ongkir & checkout dinonaktifkan")
 	}
 	if !cdn.Enabled() {
-		slog.Warn("kredensial Cloudinary kosong: unggah gambar dinonaktifkan")
+		slog.Warn("kredensial Cloudinary kosong: unggah gambar dan bukti pembayaran dinonaktifkan")
 	}
 
 	return &Server{

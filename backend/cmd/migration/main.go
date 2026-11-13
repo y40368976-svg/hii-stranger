@@ -1,4 +1,6 @@
-// Command migration menjalankan file SQL di folder migrations/ ke database.
+// Command migration menjalankan file SQL di folder migrations/ ke database
+// memakai golang-migrate (SDD D-10): berkas up/down, satu baris catatan versi
+// di tabel schema_migrations (version, dirty).
 //
 // Cara pakai (dari folder backend):
 //
@@ -6,6 +8,8 @@
 //	go run ./cmd/migration down           batalkan 1 migrasi terakhir
 //	go run ./cmd/migration down 3         batalkan 3 migrasi terakhir
 //	go run ./cmd/migration status         lihat mana yang sudah / belum jalan
+//	go run ./cmd/migration force <versi>  tandai versi tanpa menjalankan SQL
+//	                                      (untuk memulihkan status dirty setelah gagal)
 //	go run ./cmd/migration fresh          HAPUS semua tabel lalu jalankan ulang semua migrasi
 //	                                      (hanya boleh saat APP_ENV=dev, data ikut hilang)
 //	go run ./cmd/migration create nama    buat pasangan file .up.sql dan .down.sql baru
@@ -36,26 +40,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	pgxmigrate "github.com/golang-migrate/migrate/v4/database/pgx/v5"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/joho/godotenv"
 )
 
-const (
-	defaultDir = "migrations"
-
-	// lockKey adalah angka bebas untuk advisory lock PostgreSQL. Gunanya agar
-	// dua proses migrasi tidak berjalan bersamaan di database yang sama.
-	lockKey = 20261029
-
-	// createTable menyimpan daftar versi yang sudah dijalankan.
-	createTable = `
-		CREATE TABLE IF NOT EXISTS schema_migrations (
-			version    BIGINT      PRIMARY KEY,
-			name       TEXT        NOT NULL,
-			applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
-		)`
-)
+const defaultDir = "migrations"
 
 // fileName mencocokkan nama file migrasi, contoh: 000001_create_users_table.up.sql
 var fileName = regexp.MustCompile(`^(\d+)_([a-zA-Z0-9_]+)\.(up|down)\.sql$`)
@@ -65,7 +58,7 @@ type migration struct {
 	version  int64
 	name     string
 	upPath   string
-	downPath string // boleh kosong bila file .down.sql tidak ada
+	downPath string
 }
 
 // label menghasilkan teks seperti "000001_create_users_table" untuk dicetak.
@@ -81,7 +74,6 @@ func main() {
 }
 
 func run(args []string) error {
-	// Baca opsi -dir dan perintah (up / down / status / create).
 	flags := flag.NewFlagSet("migration", flag.ContinueOnError)
 	dir := flags.String("dir", defaultDir, "folder berisi file migrasi")
 	flags.Usage = func() { printUsage(flags) }
@@ -104,11 +96,13 @@ func run(args []string) error {
 		return create(*dir, rest)
 	}
 
-	if cmd != "up" && cmd != "down" && cmd != "status" && cmd != "fresh" {
+	switch cmd {
+	case "up", "down", "status", "fresh", "force":
+	case "":
 		printUsage(flags)
-		if cmd == "" {
-			return errors.New("perintah belum diisi")
-		}
+		return errors.New("perintah belum diisi")
+	default:
+		printUsage(flags)
 		return fmt.Errorf("perintah %q tidak dikenal", cmd)
 	}
 
@@ -118,49 +112,49 @@ func run(args []string) error {
 		return err
 	}
 
-	// Ctrl+C membatalkan ctx; migrasi yang sedang jalan akan di-rollback.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	conn, err := connect(ctx)
+	url, err := databaseURL()
 	if err != nil {
 		return err
 	}
+
+	// Koneksi langsung hanya untuk "fresh" dan konversi catatan lama.
+	conn, err := pgx.Connect(ctx, url)
+	if err != nil {
+		return fmt.Errorf("koneksi database: %w", err)
+	}
 	defer conn.Close(context.Background())
 
-	// Kunci supaya tidak ada proses migrasi lain yang jalan bersamaan.
-	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1)", lockKey); err != nil {
-		return fmt.Errorf("ambil lock: %w", err)
-	}
-	defer func() {
-		_, _ = conn.Exec(context.Background(), "SELECT pg_advisory_unlock($1)", lockKey)
-	}()
-
-	// "fresh": kosongkan database dulu, setelah itu sama seperti "up".
 	if cmd == "fresh" {
 		if err := dropAllTables(ctx, conn); err != nil {
 			return err
 		}
 		cmd = "up"
 	}
-
-	if err := checkLegacyTable(ctx, conn); err != nil {
+	if err := convertLegacyTable(ctx, conn, migrations); err != nil {
 		return err
 	}
 
-	if _, err := conn.Exec(ctx, createTable); err != nil {
-		return fmt.Errorf("buat tabel schema_migrations: %w", err)
-	}
-
-	applied, err := appliedVersions(ctx, conn)
+	m, err := newMigrate(url, *dir)
 	if err != nil {
 		return err
 	}
+	defer m.Close()
+
+	// Ctrl+C: golang-migrate berhenti setelah migrasi yang sedang berjalan.
+	go func() {
+		<-ctx.Done()
+		select {
+		case m.GracefulStop <- true:
+		default:
+		}
+	}()
 
 	switch cmd {
 	case "up":
-		return up(ctx, conn, migrations, applied)
-
+		return up(m, migrations)
 	case "down":
 		steps := 1
 		if len(rest) > 0 {
@@ -169,55 +163,236 @@ func run(args []string) error {
 				return fmt.Errorf("jumlah langkah %q harus angka minimal 1", rest[0])
 			}
 		}
-		return down(ctx, conn, migrations, applied, steps)
-
-	default: // status
-		status(migrations, applied)
+		return down(m, migrations, steps)
+	case "force":
+		if len(rest) == 0 {
+			return errors.New("versi belum diisi, contoh: force 20261113100200")
+		}
+		v, err := strconv.Atoi(rest[0])
+		if err != nil {
+			return fmt.Errorf("versi %q harus angka", rest[0])
+		}
+		if err := m.Force(v); err != nil {
+			return fmt.Errorf("force %d: %w", v, err)
+		}
+		fmt.Printf("Versi database ditandai %d (tidak dirty).\n", v)
 		return nil
+	default: // status
+		return status(m, migrations)
 	}
 }
 
-// connect membuka satu koneksi ke database dari DB_URL / DATABASE_URL.
-func connect(ctx context.Context) (*pgx.Conn, error) {
-	// File .env opsional; variable yang sudah di-set di terminal tidak ditimpa.
+// databaseURL membaca DB_URL / DATABASE_URL (file .env ikut dibaca bila ada).
+func databaseURL() (string, error) {
 	if err := godotenv.Load(); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("baca .env: %w", err)
+		return "", fmt.Errorf("baca .env: %w", err)
 	}
-
 	url := strings.TrimSpace(os.Getenv("DB_URL"))
 	if url == "" {
 		url = strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	}
 	if url == "" {
-		return nil, errors.New("DB_URL (atau DATABASE_URL) belum di-set")
+		return "", errors.New("DB_URL (atau DATABASE_URL) belum di-set")
 	}
-
-	conn, err := pgx.Connect(ctx, url)
-	if err != nil {
-		return nil, fmt.Errorf("koneksi database: %w", err)
-	}
-	return conn, nil
+	return url, nil
 }
 
-// checkLegacyTable menolak bekerja bila tabel schema_migrations dibuat oleh
-// alat lain (golang-migrate memakai kolom version + dirty, tanpa kolom name).
-// Kalau dipaksa, catatan versinya akan kacau.
-func checkLegacyTable(ctx context.Context, conn *pgx.Conn) error {
-	var hasDirty, hasName bool
+// newMigrate menyiapkan golang-migrate: sumber berkas dari folder dir dan
+// database PostgreSQL lewat driver pgx v5.
+func newMigrate(url, dir string) (*migrate.Migrate, error) {
+	cfg, err := pgx.ParseConfig(url)
+	if err != nil {
+		return nil, fmt.Errorf("baca DB_URL: %w", err)
+	}
+	db := stdlib.OpenDB(*cfg)
+	driver, err := pgxmigrate.WithInstance(db, &pgxmigrate.Config{})
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("siapkan driver migrasi: %w", err)
+	}
+	src, err := iofs.New(os.DirFS(dir), ".")
+	if err != nil {
+		return nil, fmt.Errorf("baca folder %s: %w", dir, err)
+	}
+	m, err := migrate.NewWithInstance("iofs", src, "pgx5", driver)
+	if err != nil {
+		return nil, fmt.Errorf("siapkan golang-migrate: %w", err)
+	}
+	return m, nil
+}
+
+// convertLegacyTable memindahkan catatan dari format runner lama (satu baris
+// per versi, kolom name) ke format golang-migrate (satu baris: versi terakhir
+// dan dirty). Hanya dilakukan bila versi yang tercatat sama persis dengan
+// urutan berkas migrasi dari awal; selain itu ditolak supaya tidak salah catat.
+func convertLegacyTable(ctx context.Context, conn *pgx.Conn, migrations []migration) error {
+	var legacy bool
 	err := conn.QueryRow(ctx, `
-		SELECT COALESCE(bool_or(column_name = 'dirty'), false),
-		       COALESCE(bool_or(column_name = 'name'), false)
-		  FROM information_schema.columns
-		 WHERE table_schema = current_schema()
-		   AND table_name = 'schema_migrations'`,
-	).Scan(&hasDirty, &hasName)
+		SELECT EXISTS (SELECT 1 FROM information_schema.columns
+		                WHERE table_schema = current_schema()
+		                  AND table_name = 'schema_migrations' AND column_name = 'name')`).Scan(&legacy)
 	if err != nil {
 		return fmt.Errorf("cek schema_migrations: %w", err)
 	}
+	if !legacy {
+		return nil
+	}
 
-	if hasDirty && !hasName {
-		return errors.New("tabel schema_migrations dibuat oleh golang-migrate (format lain).\n" +
-			"Kalau ini database dev dan datanya boleh hilang, jalankan: go run ./cmd/migration fresh")
+	rows, err := conn.Query(ctx, `SELECT version FROM schema_migrations ORDER BY version`)
+	if err != nil {
+		return fmt.Errorf("baca schema_migrations lama: %w", err)
+	}
+	versions, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return fmt.Errorf("baca schema_migrations lama: %w", err)
+	}
+	for i, v := range versions {
+		if i >= len(migrations) || migrations[i].version != v {
+			return fmt.Errorf("catatan migrasi lama tidak berurutan sesuai berkas (versi %d); "+
+				"periksa schema_migrations secara manual sebelum memakai golang-migrate", v)
+		}
+	}
+
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	if _, err := tx.Exec(ctx, `DROP TABLE schema_migrations`); err != nil {
+		return fmt.Errorf("konversi schema_migrations: %w", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`CREATE TABLE schema_migrations (version BIGINT NOT NULL PRIMARY KEY, dirty BOOLEAN NOT NULL)`); err != nil {
+		return fmt.Errorf("konversi schema_migrations: %w", err)
+	}
+	if len(versions) > 0 {
+		if _, err := tx.Exec(ctx, `INSERT INTO schema_migrations (version, dirty) VALUES ($1, false)`,
+			versions[len(versions)-1]); err != nil {
+			return fmt.Errorf("konversi schema_migrations: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+	fmt.Printf("Catatan migrasi lama (%d versi) dipindah ke format golang-migrate.\n", len(versions))
+	return nil
+}
+
+// current mengembalikan versi database (0 bila belum ada migrasi).
+func current(m *migrate.Migrate) (int64, bool, error) {
+	v, dirty, err := m.Version()
+	if errors.Is(err, migrate.ErrNilVersion) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, fmt.Errorf("baca versi database: %w", err)
+	}
+	return int64(v), dirty, nil
+}
+
+func dirtyHint(m *migrate.Migrate, migrations []migration, err error) error {
+	v, dirty, verr := current(m)
+	if verr != nil || !dirty {
+		return err
+	}
+	prev := int64(-1)
+	for _, mg := range migrations {
+		if mg.version < v {
+			prev = mg.version
+		}
+	}
+	return fmt.Errorf("%w\npetunjuk: database ditandai dirty di versi %d. Perbaiki penyebabnya, lalu jalankan:\n"+
+		"  go run ./cmd/migration force %d\nkemudian ulangi perintah tadi", err, v, prev)
+}
+
+// up menjalankan semua migrasi yang belum jalan.
+func up(m *migrate.Migrate, migrations []migration) error {
+	before, _, err := current(m)
+	if err != nil {
+		return err
+	}
+	err = m.Up()
+	if errors.Is(err, migrate.ErrNoChange) {
+		fmt.Println("Database sudah versi terbaru, tidak ada migrasi baru.")
+		return nil
+	}
+	after, dirty, verr := current(m)
+	if verr != nil {
+		return verr
+	}
+	count := 0
+	for _, mg := range migrations {
+		if mg.version > before && mg.version <= after && !(dirty && mg.version == after) {
+			fmt.Println("up  ", mg.label())
+			count++
+		}
+	}
+	if err != nil {
+		return dirtyHint(m, migrations, err)
+	}
+	fmt.Printf("Selesai: %d migrasi dijalankan.\n", count)
+	return nil
+}
+
+// down membatalkan migrasi terakhir sebanyak steps.
+func down(m *migrate.Migrate, migrations []migration, steps int) error {
+	before, _, err := current(m)
+	if err != nil {
+		return err
+	}
+	var done []migration
+	for i := len(migrations) - 1; i >= 0; i-- {
+		if migrations[i].version <= before {
+			done = append(done, migrations[i])
+		}
+	}
+	if len(done) == 0 {
+		fmt.Println("Belum ada migrasi yang dijalankan, tidak ada yang dibatalkan.")
+		return nil
+	}
+	if steps > len(done) {
+		steps = len(done)
+	}
+	err = m.Steps(-steps)
+	after, _, verr := current(m)
+	if verr != nil {
+		return verr
+	}
+	count := 0
+	for _, mg := range done {
+		if mg.version > after {
+			fmt.Println("down", mg.label())
+			count++
+		}
+	}
+	if err != nil {
+		return dirtyHint(m, migrations, err)
+	}
+	fmt.Printf("Selesai: %d migrasi dibatalkan.\n", count)
+	return nil
+}
+
+// status mencetak daftar migrasi beserta tanda sudah/belum dijalankan.
+func status(m *migrate.Migrate, migrations []migration) error {
+	v, dirty, err := current(m)
+	if err != nil {
+		return err
+	}
+	pending := 0
+	for _, mg := range migrations {
+		mark := "[x]"
+		switch {
+		case dirty && mg.version == v:
+			mark = "[!]"
+		case mg.version > v:
+			mark = "[ ]"
+			pending++
+		}
+		fmt.Println(mark, mg.label())
+	}
+	fmt.Printf("\n%d sudah jalan, %d belum. Versi database: %d\n", len(migrations)-pending, pending, v)
+	if dirty {
+		fmt.Printf("PERHATIAN: versi %d dirty (migrasi terakhir gagal). Lihat: go run ./cmd/migration force\n", v)
 	}
 	return nil
 }
@@ -254,7 +429,8 @@ func dropAllTables(ctx context.Context, conn *pgx.Conn) error {
 }
 
 // loadMigrations membaca folder migrasi, memasangkan file up/down per versi,
-// lalu mengurutkannya dari versi terkecil.
+// lalu mengurutkannya dari versi terkecil. golang-migrate butuh file down
+// untuk setiap versi, jadi versi tanpa .down.sql ditolak di sini.
 func loadMigrations(dir string) ([]migration, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -262,18 +438,14 @@ func loadMigrations(dir string) ([]migration, error) {
 	}
 
 	byVersion := map[int64]*migration{}
-
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
-
 		m := fileName.FindStringSubmatch(e.Name())
 		if m == nil {
-			// File lain (mis. .gitkeep) diabaikan.
 			continue
 		}
-
 		version, err := strconv.ParseInt(m[1], 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("versi pada %s terlalu besar", e.Name())
@@ -286,12 +458,9 @@ func loadMigrations(dir string) ([]migration, error) {
 			mig = &migration{version: version, name: name}
 			byVersion[version] = mig
 		}
-
-		// Versi yang sama harus punya nama yang sama, misal 0001_a.up dan 0001_a.down.
 		if mig.name != name {
 			return nil, fmt.Errorf("versi %d dipakai dua nama berbeda: %s dan %s", version, mig.name, name)
 		}
-
 		target := &mig.upPath
 		if direction == "down" {
 			target = &mig.downPath
@@ -307,158 +476,13 @@ func loadMigrations(dir string) ([]migration, error) {
 		if m.upPath == "" {
 			return nil, fmt.Errorf("versi %d (%s) tidak punya file .up.sql", m.version, m.name)
 		}
+		if m.downPath == "" {
+			return nil, fmt.Errorf("versi %d (%s) tidak punya file .down.sql", m.version, m.name)
+		}
 		list = append(list, *m)
 	}
-
 	sort.Slice(list, func(i, j int) bool { return list[i].version < list[j].version })
 	return list, nil
-}
-
-// appliedVersions mengambil versi yang sudah tercatat di schema_migrations.
-func appliedVersions(ctx context.Context, conn *pgx.Conn) (map[int64]bool, error) {
-	rows, err := conn.Query(ctx, "SELECT version FROM schema_migrations")
-	if err != nil {
-		return nil, fmt.Errorf("baca schema_migrations: %w", err)
-	}
-
-	versions, err := pgx.CollectRows(rows, pgx.RowTo[int64])
-	if err != nil {
-		return nil, fmt.Errorf("baca schema_migrations: %w", err)
-	}
-
-	applied := make(map[int64]bool, len(versions))
-	for _, v := range versions {
-		applied[v] = true
-	}
-	return applied, nil
-}
-
-// up menjalankan semua migrasi yang belum tercatat, dari versi terkecil.
-func up(ctx context.Context, conn *pgx.Conn, migrations []migration, applied map[int64]bool) error {
-	count := 0
-
-	for _, m := range migrations {
-		if applied[m.version] {
-			continue
-		}
-
-		err := apply(ctx, conn, m.upPath, func(tx pgx.Tx) error {
-			_, err := tx.Exec(ctx,
-				"INSERT INTO schema_migrations (version, name) VALUES ($1, $2)",
-				m.version, m.name)
-			return err
-		})
-		if err != nil {
-			// 42P07 = tabel sudah ada. Biasanya sisa skema lama yang dibuat
-			// tanpa alat ini, jadi beri petunjuk cara membereskannya.
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "42P07" {
-				return fmt.Errorf("up %s: %w\n"+
-					"petunjuk: tabel ini sudah ada di database tapi belum tercatat di schema_migrations.\n"+
-					"Kalau ini database dev dan datanya boleh hilang, jalankan: go run ./cmd/migration fresh",
-					m.label(), err)
-			}
-			return fmt.Errorf("up %s: %w", m.label(), err)
-		}
-
-		fmt.Println("up  ", m.label())
-		count++
-	}
-
-	if count == 0 {
-		fmt.Println("Database sudah versi terbaru, tidak ada migrasi baru.")
-	} else {
-		fmt.Printf("Selesai: %d migrasi dijalankan.\n", count)
-	}
-	return nil
-}
-
-// down membatalkan migrasi terakhir sebanyak steps, dari versi terbesar.
-func down(ctx context.Context, conn *pgx.Conn, migrations []migration, applied map[int64]bool, steps int) error {
-	// Kumpulkan migrasi yang sudah jalan, urut dari yang paling baru.
-	var done []migration
-	for i := len(migrations) - 1; i >= 0; i-- {
-		if applied[migrations[i].version] {
-			done = append(done, migrations[i])
-		}
-	}
-
-	if len(done) == 0 {
-		fmt.Println("Belum ada migrasi yang dijalankan, tidak ada yang dibatalkan.")
-		return nil
-	}
-	if steps > len(done) {
-		steps = len(done)
-	}
-
-	for _, m := range done[:steps] {
-		if m.downPath == "" {
-			return fmt.Errorf("down %s: file .down.sql tidak ada", m.label())
-		}
-
-		err := apply(ctx, conn, m.downPath, func(tx pgx.Tx) error {
-			_, err := tx.Exec(ctx, "DELETE FROM schema_migrations WHERE version = $1", m.version)
-			return err
-		})
-		if err != nil {
-			return fmt.Errorf("down %s: %w", m.label(), err)
-		}
-
-		fmt.Println("down", m.label())
-	}
-
-	fmt.Printf("Selesai: %d migrasi dibatalkan.\n", steps)
-	return nil
-}
-
-// apply menjalankan isi file SQL dan mencatat hasilnya dalam satu transaksi.
-// Kalau ada yang gagal, semuanya dibatalkan sehingga database tidak setengah jadi.
-func apply(ctx context.Context, conn *pgx.Conn, path string, record func(pgx.Tx) error) error {
-	sql, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	tx, err := conn.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(context.Background()) }()
-
-	// Exec tanpa argumen boleh berisi beberapa perintah SQL sekaligus.
-	if _, err := tx.Exec(ctx, string(sql)); err != nil {
-		return err
-	}
-	if err := record(tx); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
-}
-
-// status mencetak daftar migrasi beserta tanda sudah/belum dijalankan.
-func status(migrations []migration, applied map[int64]bool) {
-	known := map[int64]bool{}
-	pending := 0
-
-	for _, m := range migrations {
-		known[m.version] = true
-		mark := "[ ]"
-		if applied[m.version] {
-			mark = "[x]"
-		} else {
-			pending++
-		}
-		fmt.Println(mark, m.label())
-	}
-
-	// Versi yang tercatat di database tapi file-nya sudah tidak ada.
-	for v := range applied {
-		if !known[v] {
-			fmt.Printf("[x] %d (file migrasi tidak ditemukan)\n", v)
-		}
-	}
-
-	fmt.Printf("\n%d sudah jalan, %d belum.\n", len(migrations)-pending, pending)
 }
 
 // create membuat pasangan file migrasi kosong dengan versi berupa waktu sekarang (UTC).
@@ -505,6 +529,7 @@ func printUsage(flags *flag.FlagSet) {
   go run ./cmd/migration [opsi] up
   go run ./cmd/migration [opsi] down [jumlah]
   go run ./cmd/migration [opsi] status
+  go run ./cmd/migration [opsi] force <versi>
   go run ./cmd/migration [opsi] fresh      (dev saja: hapus semua tabel lalu up)
   go run ./cmd/migration [opsi] create <nama>
 

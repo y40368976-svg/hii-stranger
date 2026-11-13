@@ -196,15 +196,10 @@ func (s *Service) UpdateStatus(ctx context.Context, id, status string, ship *Shi
 			return Order{}, ErrTrackingRequired
 		}
 		c.onUpdate = func(ctx context.Context, tx pgx.Tx, o Order) error {
-			courier := ship.CourierName
-			if courier == "" {
-				courier = courierLabel(o)
-			}
 			tracking := ship.TrackingNumber
 			var err error
 			sh, _, err = s.shipments.UpsertTx(ctx, tx, shipment.Shipment{
 				OrderID:        o.ID,
-				CourierName:    courier,
 				TrackingNumber: &tracking,
 				CoverageStatus: shipment.CoverageCovered,
 				ShippingStatus: shipment.ShippingShipped,
@@ -374,20 +369,6 @@ func etdLabel(etd string) string {
 		return "-"
 	}
 	return v + " hari"
-}
-
-func courierLabel(o Order) string {
-	parts := []string{}
-	if o.CourierCode != nil {
-		parts = append(parts, strings.ToUpper(*o.CourierCode))
-	}
-	if o.CourierService != nil {
-		parts = append(parts, *o.CourierService)
-	}
-	if len(parts) == 0 {
-		return "Kurir toko"
-	}
-	return strings.Join(parts, " ")
 }
 
 func canTransition(from, to string) bool {

@@ -23,6 +23,9 @@ var (
 	ErrNoProof = errors.New("payment: proof not uploaded")
 	// ErrAlreadyReviewed berarti pembayaran sudah diverifikasi sebelumnya.
 	ErrAlreadyReviewed = errors.New("payment: already reviewed")
+	// ErrStorageDisabled berarti penyimpanan berkas (Cloudinary) belum
+	// dikonfigurasi sehingga bukti tidak bisa diunggah atau dibuka.
+	ErrStorageDisabled = errors.New("payment: proof storage not configured")
 )
 
 // Status pembayaran. Alurnya: pending (menunggu bukti / verifikasi) lalu
@@ -51,8 +54,10 @@ const (
 	orderStatusPaid           = "paid"
 )
 
-// Payment adalah data pembayaran (schema Payment). Isi biner bukti tidak
-// pernah ikut di JSON; HasProof menandakan bukti sudah diunggah.
+// Payment adalah data pembayaran (schema Payment). Alamat bukti di Cloudinary
+// (proof_url) tidak pernah ikut di JSON supaya bukti hanya bisa dibuka lewat
+// GET /orders/{orderId}/payment/proof yang memeriksa hak akses; HasProof
+// menandakan bukti sudah diunggah dan ProofType diturunkan dari alamatnya.
 type Payment struct {
 	ID         string     `json:"id"`
 	OrderID    string     `json:"order_id"`
@@ -82,6 +87,12 @@ type AdminItem struct {
 
 type Proof struct {
 	Data []byte
+	Type string
+}
+
+// proofRef adalah alamat bukti di Cloudinary beserta tipe MIME-nya.
+type proofRef struct {
+	URL  string
 	Type string
 }
 

@@ -182,7 +182,7 @@ function OrderDrawer({ id, onClose, onChanged }: { id: string; onClose: () => vo
     onChanged();
   };
 
-  const transition = async (to: OrderStatus, extra?: { tracking_number?: string; courier_name?: string; reason?: string }) => {
+  const transition = async (to: OrderStatus, extra?: { tracking_number?: string; reason?: string }) => {
     setBusy(to);
     const ok = await run(() => adminService.updateOrderStatus(id, { order_status: to, ...extra }), "Status diperbarui: " + ORDER_STATUS_LABEL[to]);
     setBusy(null);
@@ -312,9 +312,9 @@ function OrderDrawer({ id, onClose, onChanged }: { id: string; onClose: () => vo
         <ShipDialog
           open={shipOpen}
           onClose={() => setShipOpen(false)}
-          defaultCourier={[d.courier_code?.toUpperCase(), d.courier_service].filter(Boolean).join(" ")}
+          courier={[d.courier_code?.toUpperCase(), d.courier_service].filter(Boolean).join(" ")}
           busy={busy === "shipped"}
-          onSubmit={(tracking, courier) => transition("shipped", { tracking_number: tracking, courier_name: courier || undefined })}
+          onSubmit={(tracking) => transition("shipped", { tracking_number: tracking })}
         />
       )}
       <CancelDialog open={cancelOpen} onClose={() => setCancelOpen(false)} busy={busy === "cancelled"} onSubmit={(reason) => transition("cancelled", { reason })} />
@@ -384,7 +384,6 @@ const SHIP_STATUS = [
 function ShipmentBox({ order: d, onChanged }: { order: ApiOrderDetail; onChanged: () => void }) {
   const s = d.shipment;
   const [edit, setEdit] = useState(false);
-  const [courier, setCourier] = useState(s?.courier_name ?? "");
   const [resi, setResi] = useState(s?.tracking_number ?? "");
   const [status, setStatus] = useState(s?.shipping_status ?? "pending");
   const [busy, setBusy] = useState(false);
@@ -419,7 +418,9 @@ function ShipmentBox({ order: d, onChanged }: { order: ApiOrderDetail; onChanged
         </>
       ) : (
         <div className="mt-3 space-y-3">
-          <Input className="h-10" value={courier} onChange={(e) => setCourier(e.target.value)} placeholder="Kurir" aria-label="Kurir" />
+          <p className="text-sm">
+            <span className="text-muted">Kurir:</span> <span className="font-semibold">{s.courier_name}</span>
+          </p>
           <Input className="h-10" value={resi} onChange={(e) => setResi(e.target.value)} placeholder="No. resi" aria-label="No. resi" />
           <Select value={status} onChange={setStatus} options={SHIP_STATUS} size="sm" aria-label="Status kirim" />
           <div className="flex gap-2">
@@ -430,11 +431,10 @@ function ShipmentBox({ order: d, onChanged }: { order: ApiOrderDetail; onChanged
               size="sm"
               variant="dark"
               loading={busy}
-              disabled={!courier.trim()}
               onClick={async () => {
                 setBusy(true);
                 const ok = await run(
-                  () => adminService.upsertShipment(d.id, { courier_name: courier.trim(), tracking_number: resi.trim() || null, coverage_status: "covered", shipping_status: status }),
+                  () => adminService.upsertShipment(d.id, { tracking_number: resi.trim() || null, coverage_status: "covered", shipping_status: status }),
                   "Data pengiriman disimpan & email dikirim."
                 );
                 setBusy(false);
@@ -456,26 +456,21 @@ function ShipmentBox({ order: d, onChanged }: { order: ApiOrderDetail; onChanged
 function ShipDialog({
   open,
   onClose,
-  defaultCourier,
+  courier,
   busy,
   onSubmit,
 }: {
   open: boolean;
   onClose: () => void;
-  defaultCourier: string;
+  courier: string;
   busy: boolean;
-  onSubmit: (tracking: string, courier: string) => void;
+  onSubmit: (tracking: string) => void;
 }) {
   const [tracking, setTracking] = useState("");
-  const [courier, setCourier] = useState(defaultCourier);
-  const sig = open ? defaultCourier : null;
-  const [prevSig, setPrevSig] = useState(sig);
-  if (sig !== prevSig) {
-    setPrevSig(sig);
-    if (open) {
-      setTracking("");
-      setCourier(defaultCourier);
-    }
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) setTracking("");
   }
   return (
     <Dialog
@@ -489,7 +484,7 @@ function ShipDialog({
           <Button variant="ghost" onClick={onClose}>
             Batal
           </Button>
-          <Button variant="primary" loading={busy} disabled={!tracking.trim()} onClick={() => onSubmit(tracking.trim(), courier.trim())}>
+          <Button variant="primary" loading={busy} disabled={!tracking.trim()} onClick={() => onSubmit(tracking.trim())}>
             Simpan & kirim email
           </Button>
         </div>
@@ -499,9 +494,9 @@ function ShipDialog({
         <Field label="No. resi" required>
           {(id) => <Input id={id} autoFocus value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="mis. P2411060012345" />}
         </Field>
-        <Field label="Kurir" hint="Kosongkan untuk memakai kurir dari checkout.">
-          {(id, dsc) => <Input id={id} aria-describedby={dsc} value={courier} onChange={(e) => setCourier(e.target.value)} />}
-        </Field>
+        <p className="text-sm">
+          <span className="text-muted">Kurir (pilihan pelanggan saat checkout):</span> <span className="font-semibold">{courier || "-"}</span>
+        </p>
       </div>
     </Dialog>
   );

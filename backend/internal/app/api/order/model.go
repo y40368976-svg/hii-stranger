@@ -74,7 +74,6 @@ type Order struct {
 	TotalAmount       string  `json:"total_amount"`
 	OrderStatus       string  `json:"order_status"`
 
-	ShippingProvince      *string `json:"shipping_province"`
 	ShippingDistrict      *string `json:"shipping_district"`
 	ShippingSubdistrictID *int    `json:"shipping_subdistrict_id"`
 	ShippingZipCode       *string `json:"shipping_zip_code"`
@@ -107,6 +106,7 @@ type Item struct {
 	VariantID   string  `json:"variant_id"`
 	ProductName string  `json:"product_name"`
 	Size        string  `json:"size"`
+	Color       *string `json:"color"`
 	UnitPrice   string  `json:"unit_price"`
 	Quantity    int     `json:"quantity"`
 	Subtotal    string  `json:"subtotal"`
@@ -158,7 +158,6 @@ type createRequest struct {
 type statusRequest struct {
 	OrderStatus    string  `json:"order_status"`
 	TrackingNumber *string `json:"tracking_number"`
-	CourierName    *string `json:"courier_name"`
 	Reason         *string `json:"reason"`
 }
 
@@ -166,10 +165,10 @@ type cancelRequest struct {
 	Reason *string `json:"reason"`
 }
 
-// ShipInfo adalah data resi saat order ditandai dikirim.
+// ShipInfo adalah data resi saat order ditandai dikirim. Kurir selalu kurir
+// pilihan pelanggan saat checkout (orders.courier_code dan courier_service).
 type ShipInfo struct {
 	TrackingNumber string
-	CourierName    string // kosong berarti memakai kurir dari checkout
 }
 
 type contact struct {

@@ -74,10 +74,9 @@ export function joinAddress(o: {
   shipping_kelurahan?: string | null;
   shipping_district?: string | null;
   shipping_city?: string | null;
-  shipping_province?: string | null;
   shipping_zip_code?: string | null;
 }): string {
-  const parts = [o.shipping_address, o.shipping_kelurahan, o.shipping_district, o.shipping_city, o.shipping_province]
+  const parts = [o.shipping_address, o.shipping_kelurahan, o.shipping_district, o.shipping_city]
     .map((p) => (p ?? "").trim())
     .filter((p) => p && p !== "-");
   const zip = (o.shipping_zip_code ?? "").trim();

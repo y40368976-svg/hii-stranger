@@ -124,7 +124,6 @@ export type ApiOrder = {
   shipping_address: string;
   shipping_city: string | null;
   shipping_kelurahan: string;
-  shipping_province: string | null;
   shipping_district: string | null;
   shipping_subdistrict_id: number | null;
   shipping_zip_code: string | null;
@@ -192,6 +191,7 @@ export type ApiAdminPayment = ApiPayment & {
 export type ApiShipment = {
   id: string;
   order_id: string;
+  /** Hanya dibaca: kurir pesanan saat checkout (kode + layanan). */
   courier_name: string;
   tracking_number: string | null;
   coverage_status: string;

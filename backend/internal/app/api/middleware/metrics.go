@@ -32,7 +32,7 @@ var (
 )
 
 // Metrics mencatat jumlah, status, dan durasi request. Pasang sebagai
-// middleware paling dalam (langsung membungkus ServeMux) supaya r.Pattern
+// middleware paling dalam (langsung membungkus router) supaya r.Pattern
 // sudah diisi mux saat dicatat. Request yang panic dicatat sebagai 500.
 func Metrics() Middleware {
 	return func(next http.Handler) http.Handler {

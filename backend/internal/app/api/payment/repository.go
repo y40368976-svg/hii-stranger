@@ -10,10 +10,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// paymentColumns sengaja tidak memuat proof_data supaya berkas besar tidak
-// ikut terbaca; cukup tanda ada atau tidaknya.
-const paymentColumns = `p.id, p.order_id, p.method, p.amount::text, p.unique_code, p.proof_type,
-	p.proof_data IS NOT NULL, p.status, p.paid_at, p.reviewed_by, p.reviewed_at, p.created_at`
+// proofTypeSQL menurunkan tipe MIME bukti dari ekstensi proof_url (alamat
+// Cloudinary selalu berakhiran format berkas).
+const proofTypeSQL = `CASE
+	WHEN p.proof_url IS NULL THEN NULL
+	WHEN p.proof_url ILIKE '%.pdf' THEN 'application/pdf'
+	WHEN p.proof_url ILIKE '%.png' THEN 'image/png'
+	WHEN p.proof_url ILIKE '%.webp' THEN 'image/webp'
+	ELSE 'image/jpeg' END`
+
+// paymentColumns tidak memuat proof_url; alamat bukti hanya dibaca GetProof.
+const paymentColumns = `p.id, p.order_id, p.method, p.amount::text, p.unique_code, ` + proofTypeSQL + `,
+	p.proof_url IS NOT NULL, p.status, p.paid_at, p.reviewed_by, p.reviewed_at, p.created_at`
 
 // Repository mengakses tabel payments (dan membaca/mengubah orders seperlunya).
 type Repository struct {
@@ -102,7 +110,36 @@ func (r *Repository) Create(ctx context.Context, orderID, userID, method string,
 // SaveProof menyimpan (atau mengganti) bukti pembayaran milik order. Status
 // kembali pending dan hasil verifikasi sebelumnya dihapus. Ditolak bila
 // pembayaran sudah approved atau order sudah tidak menunggu pembayaran.
-func (r *Repository) SaveProof(ctx context.Context, orderID string, proof Proof) (Payment, error) {
+// CheckProofUpload memeriksa lebih dulu apakah bukti boleh diunggah (tanpa
+// mengunci), supaya berkas tidak dikirim ke Cloudinary untuk pembayaran yang
+// pasti ditolak. SaveProof tetap memeriksa ulang di dalam transaksi.
+func (r *Repository) CheckProofUpload(ctx context.Context, orderID string) error {
+	var status, orderStatus string
+	err := r.db.QueryRow(ctx,
+		`SELECT p.status, o.order_status
+		   FROM payments p
+		   JOIN orders o ON o.id = p.order_id
+		  WHERE p.order_id = $1
+		  ORDER BY p.id
+		  LIMIT 1`,
+		orderID).Scan(&status, &orderStatus)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return wrap("check proof upload", err)
+	}
+	if status == StatusApproved {
+		return ErrAlreadyApproved
+	}
+	if orderStatus != orderStatusPendingPayment {
+		return ErrOrderNotPayable
+	}
+	return nil
+}
+
+// SaveProof menyimpan alamat bukti (proofURL di Cloudinary) milik order.
+func (r *Repository) SaveProof(ctx context.Context, orderID, proofURL string) (Payment, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return Payment{}, wrap("save proof begin", err)
@@ -134,11 +171,11 @@ func (r *Repository) SaveProof(ctx context.Context, orderID string, proof Proof)
 
 	p, err := scanPayment(tx.QueryRow(ctx,
 		`UPDATE payments AS p
-		    SET proof_data = $2, proof_type = $3, status = $4, paid_at = now(),
+		    SET proof_url = $2, status = $3, paid_at = now(),
 		        reviewed_by = NULL, reviewed_at = NULL
 		  WHERE p.id = $1
 		  RETURNING `+paymentColumns,
-		id, proof.Data, proof.Type, StatusPending))
+		id, proofURL, StatusPending))
 	if err != nil {
 		return Payment{}, wrap("save proof update", err)
 	}
@@ -149,26 +186,22 @@ func (r *Repository) SaveProof(ctx context.Context, orderID string, proof Proof)
 	return p, nil
 }
 
-// GetProof mengambil berkas bukti pembayaran order. ErrNotFound bila belum ada.
-func (r *Repository) GetProof(ctx context.Context, orderID string) (Proof, error) {
-	var pr Proof
-	var typ *string
+// GetProof mengambil alamat bukti pembayaran order di Cloudinary beserta
+// tipenya. ErrNotFound bila belum ada.
+func (r *Repository) GetProof(ctx context.Context, orderID string) (proofRef, error) {
+	var ref proofRef
 	err := r.db.QueryRow(ctx,
-		`SELECT proof_data, proof_type FROM payments
-		  WHERE order_id = $1 AND proof_data IS NOT NULL
-		  ORDER BY id LIMIT 1`,
-		orderID).Scan(&pr.Data, &typ)
+		`SELECT p.proof_url, `+proofTypeSQL+` FROM payments p
+		  WHERE p.order_id = $1 AND p.proof_url IS NOT NULL
+		  ORDER BY p.id LIMIT 1`,
+		orderID).Scan(&ref.URL, &ref.Type)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Proof{}, ErrNotFound
+		return proofRef{}, ErrNotFound
 	}
 	if err != nil {
-		return Proof{}, wrap("get proof", err)
+		return proofRef{}, wrap("get proof", err)
 	}
-	pr.Type = "application/octet-stream"
-	if typ != nil {
-		pr.Type = *typ
-	}
-	return pr, nil
+	return ref, nil
 }
 
 // List mengambil satu halaman pembayaran (antrean verifikasi admin). Yang
@@ -192,7 +225,7 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]A
 		   FROM payments p
 		   JOIN orders o ON o.id = p.order_id
 		   JOIN users u ON u.id = o.user_id%s
-		 ORDER BY (p.status = 'pending' AND p.proof_data IS NOT NULL) DESC,
+		 ORDER BY (p.status = 'pending' AND p.proof_url IS NOT NULL) DESC,
 		          p.paid_at DESC NULLS LAST, p.created_at DESC, p.id
 		 LIMIT $%d OFFSET $%d`, paymentColumns, where, len(args)-1, len(args)),
 		args...)
@@ -260,7 +293,7 @@ func (r *Repository) Review(ctx context.Context, paymentID, adminID, status stri
 		hasProof                      bool
 	)
 	err = tx.QueryRow(ctx,
-		`SELECT p.status, p.proof_data IS NOT NULL, p.order_id, o.order_status
+		`SELECT p.status, p.proof_url IS NOT NULL, p.order_id, o.order_status
 		   FROM payments p
 		   JOIN orders o ON o.id = p.order_id
 		  WHERE p.id = $1

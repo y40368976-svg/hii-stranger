@@ -18,7 +18,7 @@ import (
 const (
 	uniqueViolation = "23505"
 
-	itemColumns = `oi.id, oi.order_id, oi.product_id, oi.variant_id, oi.product_name, oi.size,
+	itemColumns = `oi.id, oi.order_id, oi.product_id, oi.variant_id, oi.product_name, oi.size, oi.color,
 		oi.unit_price::text, oi.quantity, oi.subtotal::text,
 		(SELECT pi.image_url FROM product_images pi WHERE pi.product_id = oi.product_id
 		  ORDER BY pi.is_primary DESC, pi.sort_order, pi.id LIMIT 1)`
@@ -34,7 +34,7 @@ const (
 var orderFields = []string{
 	"id", "order_number", "user_id", "recipient_name", "recipient_phone", "shipping_address",
 	"shipping_city", "shipping_kelurahan", "subtotal::text", "shipping_cost::text", "total_amount::text", "order_status",
-	"shipping_province", "shipping_district", "shipping_subdistrict_id", "shipping_zip_code",
+	"shipping_district", "shipping_subdistrict_id", "shipping_zip_code",
 	"courier_code", "courier_service", "shipping_etd", "shipping_weight_gram",
 	"created_at", "updated_at", "payment_due_at", "cancel_reason",
 }
@@ -58,6 +58,7 @@ type cartLine struct {
 	Quantity      int
 	Stock         int
 	Size          string
+	Color         *string
 	ProductID     string
 	ProductName   string
 	ProductStatus string
@@ -124,7 +125,7 @@ func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, u
 	total := new(big.Rat).Add(subtotal, shippingCost)
 
 	window := defaultPaymentWindow
-	err = tx.QueryRow(ctx, `SELECT payment_window_hours FROM site_settings WHERE id = 1`).Scan(&window)
+	err = tx.QueryRow(ctx, `SELECT payment_window_hours FROM site_settings LIMIT 1`).Scan(&window)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return Order{}, wrap("checkout payment window", err)
 	}
@@ -133,15 +134,15 @@ func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, u
 	o, err := scanOrder(tx.QueryRow(ctx,
 		`INSERT INTO orders AS o
 		   (order_number, user_id, recipient_name, recipient_phone, shipping_address,
-		    shipping_province, shipping_city, shipping_district, shipping_kelurahan,
+		    shipping_city, shipping_district, shipping_kelurahan,
 		    shipping_subdistrict_id, shipping_zip_code,
 		    courier_code, courier_service, shipping_etd, shipping_weight_gram,
 		    subtotal, shipping_cost, total_amount, order_status, payment_due_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-		         $16::numeric, $17::numeric, $18::numeric, $19, now() + make_interval(hours => $20))
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+		         $15::numeric, $16::numeric, $17::numeric, $18, now() + make_interval(hours => $19))
 		 RETURNING `+orderColumns,
 		orderNumber, userID, in.RecipientName, in.RecipientPhone, in.ShippingAddress,
-		a.Province, a.City, a.District, a.Subdistrict,
+		a.City, a.District, a.Subdistrict,
 		a.SubdistrictID, nullIfEmpty(a.ZipCode),
 		ship.Option.CourierCode, ship.Option.Service, nullIfEmpty(ship.Option.ETD), ship.WeightGram,
 		subtotal.FloatString(2), cost, total.FloatString(2), StatusPendingPayment, window))
@@ -152,9 +153,9 @@ func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, u
 	for _, l := range lines {
 		_, err := tx.Exec(ctx,
 			`INSERT INTO order_items
-			   (order_id, product_id, variant_id, product_name, size, unit_price, quantity, subtotal)
-			 VALUES ($1, $2, $3, $4, $5, $6::numeric, $7, $8::numeric)`,
-			o.ID, l.ProductID, l.VariantID, l.ProductName, l.Size, l.UnitPrice, l.Quantity, l.Subtotal)
+			   (order_id, product_id, variant_id, product_name, size, color, unit_price, quantity, subtotal)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7::numeric, $8, $9::numeric)`,
+			o.ID, l.ProductID, l.VariantID, l.ProductName, l.Size, l.Color, l.UnitPrice, l.Quantity, l.Subtotal)
 		if err != nil {
 			return Order{}, wrap("checkout insert item", err)
 		}
@@ -198,7 +199,7 @@ func checkCustomer(ctx context.Context, q queryRower, userID string) error {
 	var role, status string
 	var verified bool
 	err := q.QueryRow(ctx,
-		`SELECT role, status, email_verified_at IS NOT NULL FROM users WHERE id = $1`, userID).
+		`SELECT (SELECT r.code FROM roles r WHERE r.id = users.role_id), status, email_verified_at IS NOT NULL FROM users WHERE id = $1`, userID).
 		Scan(&role, &status, &verified)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotCustomer
@@ -218,7 +219,7 @@ func checkCustomer(ctx context.Context, q queryRower, userID string) error {
 // lockCartLines membaca item keranjang (semua atau sesuai ids) dan mengunci
 // baris keranjang & varian sampai transaksi selesai.
 func lockCartLines(ctx context.Context, tx pgx.Tx, userID string, ids []string) ([]cartLine, error) {
-	query := `SELECT ci.id, v.id, ci.quantity, v.stock, v.size, p.id, p.name, p.status,
+	query := `SELECT ci.id, v.id, ci.quantity, v.stock, v.size, v.color, p.id, p.name, p.status,
 	                 ` + unitPrice + `::text, (` + unitPrice + ` * ci.quantity)::text,
 	                 p.weight_gram * ci.quantity
 	            FROM cart_items ci
@@ -241,7 +242,7 @@ func lockCartLines(ctx context.Context, tx pgx.Tx, userID string, ids []string) 
 	var lines []cartLine
 	for rows.Next() {
 		var l cartLine
-		if err := rows.Scan(&l.CartItemID, &l.VariantID, &l.Quantity, &l.Stock, &l.Size,
+		if err := rows.Scan(&l.CartItemID, &l.VariantID, &l.Quantity, &l.Stock, &l.Size, &l.Color,
 			&l.ProductID, &l.ProductName, &l.ProductStatus, &l.UnitPrice, &l.Subtotal, &l.WeightGram); err != nil {
 			return nil, wrap("checkout scan cart", err)
 		}
@@ -258,7 +259,7 @@ const listSelect = `SELECT %s,
 	       pay.status, COALESCE(pay.has_proof, false), u.email
 	  FROM orders o
 	  JOIN users u ON u.id = o.user_id
-	  LEFT JOIN LATERAL (SELECT p.status, p.proof_data IS NOT NULL AS has_proof
+	  LEFT JOIN LATERAL (SELECT p.status, p.proof_url IS NOT NULL AS has_proof
 	                       FROM payments p WHERE p.order_id = o.id
 	                      ORDER BY p.created_at, p.id LIMIT 1) pay ON true`
 
@@ -359,7 +360,7 @@ func collectItems(rows pgx.Rows) ([]Item, error) {
 	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Item, error) {
 		var it Item
 		err := row.Scan(&it.ID, &it.OrderID, &it.ProductID, &it.VariantID, &it.ProductName,
-			&it.Size, &it.UnitPrice, &it.Quantity, &it.Subtotal, &it.ImageURL)
+			&it.Size, &it.Color, &it.UnitPrice, &it.Quantity, &it.Subtotal, &it.ImageURL)
 		return it, err
 	})
 	if err != nil {
@@ -458,7 +459,7 @@ func noProofUnderReview(ctx context.Context, tx pgx.Tx, id string) error {
 	var reviewing bool
 	err := tx.QueryRow(ctx,
 		`SELECT EXISTS (SELECT 1 FROM payments
-		                 WHERE order_id = $1 AND status = 'pending' AND proof_data IS NOT NULL)`, id).Scan(&reviewing)
+		                 WHERE order_id = $1 AND status = 'pending' AND proof_url IS NOT NULL)`, id).Scan(&reviewing)
 	if err != nil {
 		return wrap("check proof", err)
 	}
@@ -503,7 +504,7 @@ func (r *Repository) Summary(ctx context.Context) (Summary, error) {
 	b := &pgx.Batch{}
 	b.Queue(`SELECT order_status, COUNT(*) FROM orders GROUP BY order_status`)
 	b.Queue(`SELECT COUNT(*) FROM payments p JOIN orders o ON o.id = p.order_id
-	          WHERE p.status = 'pending' AND p.proof_data IS NOT NULL AND o.order_status = 'pending_payment'`)
+	          WHERE p.status = 'pending' AND p.proof_url IS NOT NULL AND o.order_status = 'pending_payment'`)
 	b.Queue(`SELECT COUNT(*) FROM orders WHERE created_at >= date_trunc('day', now())`)
 	b.Queue(`SELECT COALESCE(SUM(total_amount), 0)::text, COUNT(*) FROM orders
 	          WHERE order_status IN ('paid', 'processing', 'shipped', 'completed')
@@ -582,7 +583,7 @@ func orderDest(o *Order) []any {
 	return []any{&o.ID, &o.OrderNumber, &o.UserID, &o.RecipientName, &o.RecipientPhone,
 		&o.ShippingAddress, &o.ShippingCity, &o.ShippingKelurahan, &o.Subtotal, &o.ShippingCost,
 		&o.TotalAmount, &o.OrderStatus,
-		&o.ShippingProvince, &o.ShippingDistrict, &o.ShippingSubdistrictID, &o.ShippingZipCode,
+		&o.ShippingDistrict, &o.ShippingSubdistrictID, &o.ShippingZipCode,
 		&o.CourierCode, &o.CourierService, &o.ShippingETD, &o.ShippingWeightGram,
 		&o.CreatedAt, &o.UpdatedAt, &o.PaymentDueAt, &o.CancelReason}
 }

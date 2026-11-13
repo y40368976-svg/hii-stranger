@@ -92,7 +92,7 @@ func (h *Handler) UploadProof(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetProof melayani GET /orders/{orderId}/payment/proof: mengirim berkas apa
-// adanya dengan Content-Type sesuai proof_type.
+// adanya (diambil dari Cloudinary) dengan Content-Type sesuai proof_type.
 func (h *Handler) GetProof(w http.ResponseWriter, r *http.Request) {
 	orderID, uid, admin, ok := orderRequest(w, r)
 	if !ok {
@@ -193,6 +193,9 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, op string, 
 		conflict(w, "Bukti pembayaran belum diunggah.")
 	case errors.Is(err, ErrAlreadyReviewed):
 		conflict(w, "Pembayaran sudah diverifikasi sebelumnya.")
+	case errors.Is(err, ErrStorageDisabled):
+		response.Error(w, http.StatusServiceUnavailable, "upload_unavailable",
+			"Layanan penyimpanan bukti pembayaran belum dikonfigurasi.")
 	default:
 		slog.ErrorContext(r.Context(), op+" payment failed", "error", err)
 		response.Internal(w)

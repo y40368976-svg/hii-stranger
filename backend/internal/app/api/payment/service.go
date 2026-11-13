@@ -3,25 +3,36 @@ package payment
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/big"
 
+	"hii-stranger1/backend/internal/pkg/cloudinary"
 	"hii-stranger1/backend/internal/pkg/mailer"
 )
 
 // maxUniqueCode adalah batas atas kode unik transfer (1 sampai 999 rupiah).
 const maxUniqueCode = 999
 
-// Service berisi logika bisnis pembayaran.
-type Service struct {
-	repo *Repository
-	mail *mailer.Mailer
+// ProofStorage menyimpan dan mengambil berkas bukti pembayaran (Cloudinary).
+type ProofStorage interface {
+	Enabled() bool
+	UploadProof(ctx context.Context, contentType string, data []byte) (string, error)
+	Fetch(ctx context.Context, url string, maxBytes int64) ([]byte, error)
 }
 
-// NewService membuat Service. mail boleh nonaktif (SMTP belum diisi).
-func NewService(repo *Repository, mail *mailer.Mailer) *Service {
-	return &Service{repo: repo, mail: mail}
+// Service berisi logika bisnis pembayaran.
+type Service struct {
+	repo  *Repository
+	mail  *mailer.Mailer
+	files ProofStorage
+}
+
+// NewService membuat Service. mail boleh nonaktif (SMTP belum diisi); files
+// adalah penyimpanan bukti pembayaran di Cloudinary (SDD D-07).
+func NewService(repo *Repository, mail *mailer.Mailer, files ProofStorage) *Service {
+	return &Service{repo: repo, mail: mail, files: files}
 }
 
 // Get mengambil pembayaran order. Hanya pemilik order atau admin; selain itu
@@ -49,7 +60,20 @@ func (s *Service) UploadProof(ctx context.Context, orderID, userID string, proof
 	if err := s.checkAccess(ctx, orderID, userID, false); err != nil {
 		return Payment{}, err
 	}
-	p, err := s.repo.SaveProof(ctx, orderID, proof)
+	if !s.files.Enabled() {
+		return Payment{}, ErrStorageDisabled
+	}
+	if err := s.repo.CheckProofUpload(ctx, orderID); err != nil {
+		return Payment{}, err
+	}
+	proofURL, err := s.files.UploadProof(ctx, proof.Type, proof.Data)
+	if err != nil {
+		if errors.Is(err, cloudinary.ErrDisabled) {
+			return Payment{}, ErrStorageDisabled
+		}
+		return Payment{}, fmt.Errorf("payment: upload proof: %w", err)
+	}
+	p, err := s.repo.SaveProof(ctx, orderID, proofURL)
 	if err != nil {
 		return Payment{}, err
 	}
@@ -76,7 +100,17 @@ func (s *Service) Proof(ctx context.Context, orderID, userID string, admin bool)
 	if err := s.checkAccess(ctx, orderID, userID, admin); err != nil {
 		return Proof{}, err
 	}
-	return s.repo.GetProof(ctx, orderID)
+	ref, err := s.repo.GetProof(ctx, orderID)
+	if err != nil {
+		return Proof{}, err
+	}
+	// Berkas diambil server dari Cloudinary lalu diteruskan, sehingga alamat
+	// Cloudinary tidak pernah sampai ke klien dan hak akses tetap diperiksa.
+	data, err := s.files.Fetch(ctx, ref.URL, maxProofBytes)
+	if err != nil {
+		return Proof{}, fmt.Errorf("payment: fetch proof: %w", err)
+	}
+	return Proof{Data: data, Type: ref.Type}, nil
 }
 
 // List mengambil satu halaman pembayaran (admin).

@@ -9,9 +9,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Tabel site_settings hanya berisi satu baris (dijaga indeks unik
+// uq_site_settings_singleton); id-nya UUID sesuai SDD sehingga baris dibaca
+// tanpa menyebut id. maintenance_message boleh NULL di basis data.
 const (
-	singletonID     = 1
-	settingsColumns = `maintenance_mode, maintenance_message, qris_image_url, qris_merchant_name, qris_nmid, payment_window_hours`
+	settingsColumns = `maintenance_mode, COALESCE(maintenance_message, ''), qris_image_url, qris_merchant_name, qris_nmid, payment_window_hours`
 	defaultMessage  = "Toko sedang dalam perawatan. Silakan kembali beberapa saat lagi."
 	defaultWindow   = 24
 )
@@ -28,7 +30,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 
 // Get mengembalikan pengaturan; nilai default bila baris belum ada.
 func (r *Repository) Get(ctx context.Context) (Settings, error) {
-	s, err := scan(r.db.QueryRow(ctx, `SELECT `+settingsColumns+` FROM site_settings WHERE id = $1`, singletonID))
+	s, err := scan(r.db.QueryRow(ctx, `SELECT `+settingsColumns+` FROM site_settings LIMIT 1`))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Settings{MaintenanceMessage: defaultMessage, PaymentWindowHours: defaultWindow}, nil
 	}
@@ -38,21 +40,25 @@ func (r *Repository) Get(ctx context.Context) (Settings, error) {
 	return s, nil
 }
 
-// Save menyimpan seluruh pengaturan (upsert baris tunggal).
+// Save menyimpan seluruh pengaturan: mengubah baris yang ada, atau membuatnya
+// bila belum ada. Pesan maintenance kosong disimpan sebagai NULL.
 func (r *Repository) Save(ctx context.Context, s Settings) (Settings, error) {
 	out, err := scan(r.db.QueryRow(ctx,
-		`INSERT INTO site_settings (id, maintenance_mode, maintenance_message, qris_image_url,
-		                            qris_merchant_name, qris_nmid, payment_window_hours)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 ON CONFLICT (id) DO UPDATE
-		    SET maintenance_mode = EXCLUDED.maintenance_mode,
-		        maintenance_message = EXCLUDED.maintenance_message,
-		        qris_image_url = EXCLUDED.qris_image_url,
-		        qris_merchant_name = EXCLUDED.qris_merchant_name,
-		        qris_nmid = EXCLUDED.qris_nmid,
-		        payment_window_hours = EXCLUDED.payment_window_hours
-		 RETURNING `+settingsColumns,
-		singletonID, s.MaintenanceMode, s.MaintenanceMessage, s.QRISImageURL,
+		`WITH upd AS (
+		     UPDATE site_settings
+		        SET maintenance_mode = $1, maintenance_message = NULLIF($2::text, ''),
+		            qris_image_url = $3, qris_merchant_name = $4, qris_nmid = $5,
+		            payment_window_hours = $6
+		  RETURNING `+settingsColumns+`
+		 ), ins AS (
+		     INSERT INTO site_settings (maintenance_mode, maintenance_message, qris_image_url,
+		                                qris_merchant_name, qris_nmid, payment_window_hours)
+		     SELECT $1::boolean, NULLIF($2::text, ''), $3::text, $4::text, $5::text, $6::int
+		      WHERE NOT EXISTS (SELECT 1 FROM upd)
+		  RETURNING `+settingsColumns+`
+		 )
+		 SELECT * FROM upd UNION ALL SELECT * FROM ins`,
+		s.MaintenanceMode, s.MaintenanceMessage, s.QRISImageURL,
 		s.QRISMerchantName, s.QRISNMID, s.PaymentWindowHours))
 	if err != nil {
 		return Settings{}, fmt.Errorf("sitesetting: save: %w", err)

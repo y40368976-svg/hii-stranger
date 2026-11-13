@@ -5,6 +5,7 @@ package cloudinary
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
@@ -14,7 +15,9 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -53,24 +56,84 @@ func (c *Client) Enabled() bool {
 	return c != nil && c.cloudName != "" && c.apiKey != "" && c.apiSecret != ""
 }
 
+// deliveryHost adalah host penyajian berkas Cloudinary; Fetch hanya mau
+// mengambil berkas dari host ini.
+const deliveryHost = "res.cloudinary.com"
+
 // UploadImage mengirim data gambar ke Cloudinary dan mengembalikan secure_url
 // (alamat https) yang bisa langsung disimpan sebagai image_url.
 func (c *Client) UploadImage(ctx context.Context, filename string, data []byte) (string, error) {
+	return c.upload(ctx, "image", "", nil, filename, data)
+}
+
+// UploadProof mengunggah bukti pembayaran ke subfolder payment-proofs dan
+// mengembalikan secure_url-nya. Gambar diunggah sebagai resource image; PDF
+// sebagai resource raw dengan public_id berakhiran .pdf, karena penyajian
+// PDF sebagai image sering dinonaktifkan pada akun Cloudinary.
+func (c *Client) UploadProof(ctx context.Context, contentType string, data []byte) (string, error) {
+	if contentType == "application/pdf" {
+		id, err := randomID()
+		if err != nil {
+			return "", err
+		}
+		return c.upload(ctx, "raw", "payment-proofs", map[string]string{"public_id": id + ".pdf"}, "proof.pdf", data)
+	}
+	return c.upload(ctx, "image", "payment-proofs", nil, "proof", data)
+}
+
+// Fetch mengambil berkas dari alamat Cloudinary (secure_url hasil unggah)
+// dengan batas maxBytes. Alamat selain https://res.cloudinary.com ditolak
+// supaya server tidak bisa dipakai mengambil alamat sembarang.
+func (c *Client) Fetch(ctx context.Context, rawURL string, maxBytes int64) ([]byte, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "https" || u.Host != deliveryHost {
+		return nil, fmt.Errorf("cloudinary: fetch: alamat bukan Cloudinary: %q", rawURL)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("cloudinary: fetch request: %w", err)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("cloudinary: fetch: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("cloudinary: fetch status %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("cloudinary: fetch read: %w", err)
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, fmt.Errorf("cloudinary: fetch: berkas melebihi %d byte", maxBytes)
+	}
+	return data, nil
+}
+
+// upload mengirim berkas ke Upload API. subfolder ditambahkan di bawah folder
+// akun (boleh kosong); extra berisi parameter tambahan yang ikut ditandatangani.
+func (c *Client) upload(ctx context.Context, resourceType, subfolder string, extra map[string]string, filename string, data []byte) (string, error) {
 	if !c.Enabled() {
 		return "", ErrDisabled
 	}
 
-	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	params := map[string]string{"timestamp": strconv.FormatInt(time.Now().Unix(), 10)}
+	if folder := strings.Trim(c.folder+"/"+subfolder, "/"); folder != "" {
+		params["folder"] = folder
+	}
+	for k, v := range extra {
+		params[k] = v
+	}
 
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
 	fields := map[string]string{
 		"api_key":   c.apiKey,
-		"timestamp": timestamp,
-		"signature": c.sign(timestamp),
+		"signature": c.sign(params),
 	}
-	if c.folder != "" {
-		fields["folder"] = c.folder
+	for k, v := range params {
+		fields[k] = v
 	}
 	for k, v := range fields {
 		if err := mw.WriteField(k, v); err != nil {
@@ -88,7 +151,7 @@ func (c *Client) UploadImage(ctx context.Context, filename string, data []byte) 
 		return "", fmt.Errorf("cloudinary: close multipart: %w", err)
 	}
 
-	endpoint := apiBase + url.PathEscape(c.cloudName) + "/image/upload"
+	endpoint := apiBase + url.PathEscape(c.cloudName) + "/" + resourceType + "/upload"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, &body)
 	if err != nil {
 		return "", fmt.Errorf("cloudinary: new request: %w", err)
@@ -120,11 +183,25 @@ func (c *Client) UploadImage(ctx context.Context, filename string, data []byte) 
 // sign membuat signature sesuai aturan Cloudinary: parameter (selain file,
 // api_key, dan signature) diurutkan menurut nama, digabung "a=1&b=2", lalu
 // ditambah api secret dan di-hash SHA-1.
-func (c *Client) sign(timestamp string) string {
-	params := "timestamp=" + timestamp
-	if c.folder != "" {
-		params = "folder=" + c.folder + "&" + params
+func (c *Client) sign(params map[string]string) string {
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		keys = append(keys, k)
 	}
-	sum := sha1.Sum([]byte(params + c.apiSecret))
+	sort.Strings(keys)
+	pairs := make([]string, len(keys))
+	for i, k := range keys {
+		pairs[i] = k + "=" + params[k]
+	}
+	sum := sha1.Sum([]byte(strings.Join(pairs, "&") + c.apiSecret))
 	return hex.EncodeToString(sum[:])
+}
+
+// randomID membuat nama berkas acak (32 karakter hex) untuk public_id.
+func randomID() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("cloudinary: random id: %w", err)
+	}
+	return hex.EncodeToString(b), nil
 }
