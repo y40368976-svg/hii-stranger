@@ -81,5 +81,53 @@
     "command": "git status -sb | Select-Object -First 30",
     "cwd": "$ZED_WORKTREE_ROOT",
     "reveal": "always"
+  },
+  {
+    "label": "backend: test fungsi di kursor",
+    "command": "go test -count=1 -v -run \"^$ZED_SYMBOL$\" . 2>&1 | Select-Object -Last 40",
+    "cwd": "$ZED_DIRNAME",
+    "reveal": "always"
+  },
+  {
+    "label": "backend: test coverage",
+    "command": "go test -count=1 \"-coverprofile=cover.out\" ./... 2>&1 | Where-Object { $_ -notmatch '^(ok|\\?)\\s' } | Select-Object -Last 40; go tool cover \"-func=cover.out\" | Select-Object -Last 1; Remove-Item cover.out -ErrorAction SilentlyContinue",
+    "cwd": "$ZED_WORKTREE_ROOT/backend",
+    "reveal": "always"
+  },
+  {
+    "label": "backend: test modul order+payment",
+    "command": "go test -count=1 ./internal/app/api/order/... ./internal/app/api/payment/... 2>&1 | Select-Object -Last 30",
+    "cwd": "$ZED_WORKTREE_ROOT/backend",
+    "reveal": "always"
+  },
+  {
+    "label": "backend: build",
+    "command": "go build ./... 2>&1 | Select-Object -Last 20; 'build selesai'",
+    "cwd": "$ZED_WORKTREE_ROOT/backend",
+    "reveal": "always"
+  },
+  {
+    "label": "frontend: generate tipe API",
+    "command": "pnpm gen:api 2>&1 | Select-Object -Last 15",
+    "cwd": "$ZED_WORKTREE_ROOT/frontend",
+    "reveal": "always"
+  },
+  {
+    "label": "frontend: test (semua)",
+    "command": "pnpm test 2>&1 | Select-Object -Last 40",
+    "cwd": "$ZED_WORKTREE_ROOT/frontend",
+    "reveal": "always"
+  },
+  {
+    "label": "frontend: test file ini",
+    "command": "pnpm exec vitest run (Split-Path \"$ZED_FILE\" -Leaf) 2>&1 | Select-Object -Last 40",
+    "cwd": "$ZED_WORKTREE_ROOT/frontend",
+    "reveal": "always"
+  },
+  {
+    "label": "backend: test integrasi cart (butuh TEST_DATABASE_URL)",
+    "command": "if (-not $env:TEST_DATABASE_URL) { 'Set dulu: $env:TEST_DATABASE_URL (DB uji, bukan produksi)' } else { go test -count=1 -tags integration ./internal/app/api/cart/ 2>&1 | Select-Object -Last 30 }",
+    "cwd": "$ZED_WORKTREE_ROOT/backend",
+    "reveal": "always"
   }
 ]
