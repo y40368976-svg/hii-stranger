@@ -1,20 +1,20 @@
 [
   {
     "label": "backend: vet",
-    "command": "make vet 2>&1 | tail -20",
+    "command": "make vet 2>&1 | Select-Object -Last 20",
     "cwd": "$ZED_WORKTREE_ROOT/backend",
     "use_new_terminal": false,
     "reveal": "always"
   },
   {
     "label": "backend: test (hanya gagal)",
-    "command": "go test ./... 2>&1 | grep -Ev '^(ok|\\?)\\s' | tail -30",
+    "command": "go test ./... 2>&1 | Where-Object { $_ -notmatch '^(ok|\\?)\\s' } | Select-Object -Last 30",
     "cwd": "$ZED_WORKTREE_ROOT/backend",
     "reveal": "always"
   },
   {
     "label": "backend: lint (golangci-lint)",
-    "command": "golangci-lint run ./... 2>&1 | tail -25",
+    "command": "golangci-lint run ./... 2>&1 | Select-Object -Last 25",
     "cwd": "$ZED_WORKTREE_ROOT/backend",
     "reveal": "always"
   },
@@ -28,13 +28,13 @@
   },
   {
     "label": "frontend: lint",
-    "command": "pnpm lint 2>&1 | tail -25",
+    "command": "pnpm lint 2>&1 | Select-Object -Last 25",
     "cwd": "$ZED_WORKTREE_ROOT/frontend",
     "reveal": "always"
   },
   {
     "label": "frontend: typecheck",
-    "command": "pnpm exec tsc --noEmit 2>&1 | grep -E 'error TS' | head -20",
+    "command": "pnpm exec tsc --noEmit 2>&1 | Select-String 'error TS' | Select-Object -First 20",
     "cwd": "$ZED_WORKTREE_ROOT/frontend",
     "reveal": "always"
   },
@@ -48,37 +48,37 @@
   },
   {
     "label": "backend: test package file ini",
-    "command": "go test -count=1 . 2>&1 | tail -30",
+    "command": "go test -count=1 . 2>&1 | Select-Object -Last 30",
     "cwd": "$ZED_DIRNAME",
     "reveal": "always"
   },
   {
     "label": "backend: test -race",
-    "command": "make test-race 2>&1 | grep -Ev '^(ok|\\?)\\s' | tail -30",
+    "command": "make test-race 2>&1 | Where-Object { $_ -notmatch '^(ok|\\?)\\s' } | Select-Object -Last 30",
     "cwd": "$ZED_WORKTREE_ROOT/backend",
     "reveal": "always"
   },
   {
     "label": "backend: fmt",
-    "command": "make fmt 2>&1 | tail -10",
+    "command": "make fmt 2>&1 | Select-Object -Last 10",
     "cwd": "$ZED_WORKTREE_ROOT/backend",
     "reveal": "always"
   },
   {
     "label": "frontend: build",
-    "command": "pnpm build 2>&1 | tail -25",
+    "command": "pnpm build 2>&1 | Select-Object -Last 25",
     "cwd": "$ZED_WORKTREE_ROOT/frontend",
     "reveal": "always"
   },
   {
     "label": "CEK SEMUA (vet+test+lint+tsc)",
-    "command": "(cd backend && make vet 2>&1 | tail -20; go test ./... 2>&1 | grep -Ev '^(ok|\\?)\\s' | tail -30) ; (cd frontend && pnpm lint 2>&1 | tail -25; pnpm exec tsc --noEmit 2>&1 | grep -E 'error TS' | head -20); echo SELESAI",
+    "command": "Push-Location backend; make vet 2>&1 | Select-Object -Last 20; go test ./... 2>&1 | Where-Object { $_ -notmatch '^(ok|\\?)\\s' } | Select-Object -Last 30; Pop-Location; Push-Location frontend; pnpm lint 2>&1 | Select-Object -Last 25; pnpm exec tsc --noEmit 2>&1 | Select-String 'error TS' | Select-Object -First 20; Pop-Location; 'SELESAI'",
     "cwd": "$ZED_WORKTREE_ROOT",
     "reveal": "always"
   },
   {
     "label": "git: status ringkas",
-    "command": "git status -sb | head -30; echo --- backend repo; git -C backend status -sb | head -20",
+    "command": "git status -sb | Select-Object -First 30",
     "cwd": "$ZED_WORKTREE_ROOT",
     "reveal": "always"
   }
