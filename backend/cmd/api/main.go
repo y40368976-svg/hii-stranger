@@ -16,7 +16,6 @@ import (
 )
 
 const (
-	Version   = "1.0.0"
 	MyAppName = "hii-stranger"
 )
 
@@ -61,7 +60,7 @@ func run() error {
 	slog.Info(
 		"server starting",
 		"app", MyAppName,
-		"version", Version,
+		"version", cfg.AppVersion,
 		"addr", ":"+cfg.Port,
 		"env", cfg.AppEnv,
 	)

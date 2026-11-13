@@ -19,6 +19,12 @@ var paramPattern = regexp.MustCompile(`\{([A-Za-z0-9_]+)\}`)
 // sehingga handler dan middleware (mis. label metrik) tidak perlu berubah.
 type ginMux struct {
 	engine *gin.Engine
+	// aliases adalah awalan tambahan (mis. "/api/v1.2.8") yang melayani rute
+	// yang sama dengan apiPrefix. Pola rute tetap kanonik (apiPrefix) agar label
+	// metrik stabil.
+	aliases []string
+	// version dikirim sebagai header X-API-Version bila tidak kosong.
+	version string
 }
 
 func newGinMux() *ginMux {
@@ -44,11 +50,17 @@ func (m *ginMux) Handle(pattern string, h http.Handler) {
 		if pattern != "/" {
 			panic("ginMux: pola tanpa method hanya boleh \"/\": " + pattern)
 		}
-		m.engine.NoRoute(adapt("", h))
-		m.engine.NoMethod(adapt("", h))
+		m.engine.NoRoute(adapt("", h, m.version))
+		m.engine.NoMethod(adapt("", h, m.version))
 		return
 	}
-	m.engine.Handle(method, paramPattern.ReplaceAllString(path, ":$1"), adapt(pattern, h))
+	handler := adapt(pattern, h, m.version)
+	m.engine.Handle(method, paramPattern.ReplaceAllString(path, ":$1"), handler)
+	if rest, ok := strings.CutPrefix(path, apiPrefix); ok && (rest == "" || rest[0] == '/') {
+		for _, a := range m.aliases {
+			m.engine.Handle(method, paramPattern.ReplaceAllString(a+rest, ":$1"), handler)
+		}
+	}
 }
 
 // HandleFunc sama dengan Handle untuk fungsi handler.
@@ -63,8 +75,11 @@ func (m *ginMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // adapt menjalankan http.Handler di dalam Gin. Request yang sama (pointer
 // yang sama dengan yang diterima middleware di luar Gin) diberi pola rute dan
 // nilai parameter path.
-func adapt(pattern string, h http.Handler) gin.HandlerFunc {
+func adapt(pattern string, h http.Handler, version string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if version != "" {
+			c.Writer.Header().Set("X-API-Version", version)
+		}
 		r := c.Request
 		r.Pattern = pattern
 		for _, p := range c.Params {

@@ -45,3 +45,31 @@ func TestGinMux(t *testing.T) {
 		t.Errorf("nested orderId = %q", gotSub)
 	}
 }
+
+func TestGinMuxVersionAliases(t *testing.T) {
+	m := newGinMux()
+	m.version = "1.2.8"
+	m.aliases = []string{"/api/v1.2.8", "/api/v1.2.7"}
+	var gotPattern string
+	m.HandleFunc("GET /api/v1/orders/{orderId}", func(w http.ResponseWriter, r *http.Request) {
+		gotPattern = r.Pattern
+		w.WriteHeader(http.StatusOK)
+	})
+	m.HandleFunc("/", notFound)
+	for _, p := range []string{"/api/v1/orders/a", "/api/v1.2.8/orders/a", "/api/v1.2.7/orders/a"} {
+		gotPattern = ""
+		rec := httptest.NewRecorder()
+		m.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, p, nil))
+		if rec.Code != http.StatusOK || gotPattern != "GET /api/v1/orders/{orderId}" {
+			t.Errorf("%s = %d pattern %q", p, rec.Code, gotPattern)
+		}
+		if rec.Header().Get("X-API-Version") != "1.2.8" {
+			t.Errorf("%s: header X-API-Version kosong", p)
+		}
+	}
+	rec := httptest.NewRecorder()
+	m.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1.2.6/orders/a", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("versi tak terdaftar = %d, want 404", rec.Code)
+	}
+}

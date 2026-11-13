@@ -28,6 +28,8 @@ import (
 )
 
 const (
+	// apiPrefix adalah base path kanonik (versi mayor). Versi lengkap dilayani
+	// juga lewat alias /api/v<versi> (lihat Config.AppVersion dan LegacyAPIVersions).
 	apiPrefix = "/api/v1"
 
 	// Batas percobaan login, register, dan ganti password per IP, untuk mempersulit tebak password.
@@ -83,6 +85,12 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 
 	// Routing memakai Gin (lihat router.go); pola rute ditulis gaya net/http.
 	mux := newGinMux()
+	mux.version = cfg.AppVersion
+	for _, v := range append([]string{cfg.AppVersion}, cfg.LegacyAPIVersions...) {
+		if v != "" {
+			mux.aliases = append(mux.aliases, "/api/v"+v)
+		}
+	}
 	mux.HandleFunc("GET "+apiPrefix+"/health", health)
 
 	mux.Handle("POST "+apiPrefix+"/auth/register",
