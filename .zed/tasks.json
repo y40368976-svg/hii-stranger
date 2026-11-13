@@ -4,19 +4,36 @@
     "command": "make vet 2>&1 | Select-Object -Last 20",
     "cwd": "$ZED_WORKTREE_ROOT/backend",
     "use_new_terminal": false,
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "allow_concurrent_runs": false
   },
   {
     "label": "backend: test (hanya gagal)",
-    "command": "go test ./... 2>&1 | Where-Object { $_ -notmatch '^(ok|\\?)\\s' } | Select-Object -Last 30",
+    "command": "go test -p 1 -parallel 1 ./... 2>&1 | Where-Object { $_ -notmatch '^(ok|\\?)\\s' } | Select-Object -Last 30",
     "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   },
   {
     "label": "backend: lint (golangci-lint)",
     "command": "golangci-lint run ./... 2>&1 | Select-Object -Last 25",
     "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   },
   {
     "label": "frontend: dev server",
@@ -24,19 +41,35 @@
     "cwd": "$ZED_WORKTREE_ROOT/frontend",
     "use_new_terminal": true,
     "allow_concurrent_runs": false,
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false
   },
   {
     "label": "frontend: lint",
     "command": "pnpm lint 2>&1 | Select-Object -Last 25",
     "cwd": "$ZED_WORKTREE_ROOT/frontend",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   },
   {
     "label": "frontend: typecheck",
     "command": "pnpm exec tsc --noEmit 2>&1 | Select-String 'error TS' | Select-Object -First 20",
     "cwd": "$ZED_WORKTREE_ROOT/frontend",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   },
   {
     "label": "backend: run API",
@@ -44,90 +77,178 @@
     "cwd": "$ZED_WORKTREE_ROOT/backend",
     "use_new_terminal": true,
     "allow_concurrent_runs": false,
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false
   },
   {
     "label": "backend: test package file ini",
-    "command": "go test -count=1 . 2>&1 | Select-Object -Last 30",
+    "command": "go test -p 1 -parallel 1 -count=1 . 2>&1 | Select-Object -Last 30",
     "cwd": "$ZED_DIRNAME",
-    "reveal": "always"
-  },
-  {
-    "label": "backend: test -race",
-    "command": "make test-race 2>&1 | Where-Object { $_ -notmatch '^(ok|\\?)\\s' } | Select-Object -Last 30",
-    "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   },
   {
     "label": "backend: fmt",
     "command": "make fmt 2>&1 | Select-Object -Last 10",
     "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   },
   {
     "label": "frontend: build",
     "command": "pnpm build 2>&1 | Select-Object -Last 25",
     "cwd": "$ZED_WORKTREE_ROOT/frontend",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   },
   {
-    "label": "CEK SEMUA (vet+test+lint+tsc)",
-    "command": "Push-Location backend; make vet 2>&1 | Select-Object -Last 20; go test ./... 2>&1 | Where-Object { $_ -notmatch '^(ok|\\?)\\s' } | Select-Object -Last 30; Pop-Location; Push-Location frontend; pnpm lint 2>&1 | Select-Object -Last 25; pnpm exec tsc --noEmit 2>&1 | Select-String 'error TS' | Select-Object -First 20; Pop-Location; 'SELESAI'",
+    "label": "CEK SEMUA (vet+test+lint+tsc+vitest)",
+    "command": "Push-Location backend; make vet 2>&1 | Select-Object -Last 20; go test -p 1 -parallel 1 ./... 2>&1 | Where-Object { $_ -notmatch '^(ok|\\?)\\s' } | Select-Object -Last 30; Pop-Location; Push-Location frontend; pnpm lint 2>&1 | Select-Object -Last 25; pnpm exec tsc --noEmit 2>&1 | Select-String 'error TS' | Select-Object -First 20; pnpm test 2>&1 | Select-Object -Last 25; Pop-Location; 'SELESAI'",
     "cwd": "$ZED_WORKTREE_ROOT",
-    "reveal": "always"
-  },
-  {
-    "label": "git: status ringkas",
-    "command": "git status -sb | Select-Object -First 30",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   },
   {
     "label": "backend: test fungsi di kursor",
-    "command": "go test -count=1 -v -run \"^$ZED_SYMBOL$\" . 2>&1 | Select-Object -Last 40",
+    "command": "go test -p 1 -parallel 1 -count=1 -v -run \"^$ZED_SYMBOL$\" . 2>&1 | Select-Object -Last 40",
     "cwd": "$ZED_DIRNAME",
-    "reveal": "always"
-  },
-  {
-    "label": "backend: test coverage",
-    "command": "go test -count=1 \"-coverprofile=cover.out\" ./... 2>&1 | Where-Object { $_ -notmatch '^(ok|\\?)\\s' } | Select-Object -Last 40; go tool cover \"-func=cover.out\" | Select-Object -Last 1; Remove-Item cover.out -ErrorAction SilentlyContinue",
-    "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "reveal": "always"
-  },
-  {
-    "label": "backend: test modul order+payment",
-    "command": "go test -count=1 ./internal/app/api/order/... ./internal/app/api/payment/... 2>&1 | Select-Object -Last 30",
-    "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "reveal": "always"
-  },
-  {
-    "label": "backend: build",
-    "command": "go build ./... 2>&1 | Select-Object -Last 20; 'build selesai'",
-    "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   },
   {
     "label": "frontend: generate tipe API",
     "command": "pnpm gen:api 2>&1 | Select-Object -Last 15",
     "cwd": "$ZED_WORKTREE_ROOT/frontend",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   },
   {
     "label": "frontend: test (semua)",
     "command": "pnpm test 2>&1 | Select-Object -Last 40",
     "cwd": "$ZED_WORKTREE_ROOT/frontend",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   },
   {
     "label": "frontend: test file ini",
     "command": "pnpm exec vitest run (Split-Path \"$ZED_FILE\" -Leaf) 2>&1 | Select-Object -Last 40",
     "cwd": "$ZED_WORKTREE_ROOT/frontend",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   },
   {
     "label": "backend: test integrasi cart (butuh TEST_DATABASE_URL)",
-    "command": "if (-not $env:TEST_DATABASE_URL) { 'Set dulu: $env:TEST_DATABASE_URL (DB uji, bukan produksi)' } else { go test -count=1 -tags integration ./internal/app/api/cart/ 2>&1 | Select-Object -Last 30 }",
+    "command": "if (-not $env:TEST_DATABASE_URL) { 'Set dulu: $env:TEST_DATABASE_URL (DB uji, bukan produksi)' } else { go test -p 1 -parallel 1 -count=1 -tags integration ./internal/app/api/cart/ 2>&1 | Select-Object -Last 30 }",
     "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "reveal": "always"
+    "reveal": "always",
+    "save": "all",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "redis: start",
+    "command": "redis-server --port 6379",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "none",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "redis: stop",
+    "command": "redis-cli -p 6379 shutdown 2>&1; 'redis mati'",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "none",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "backend: stop API (port 8080)",
+    "command": "Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; 'port 8080 bebas'",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "none",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "frontend: stop dev server (port 3000)",
+    "command": "Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; 'port 3000 bebas'",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "none",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "STOP SEMUA (frontend+backend+redis)",
+    "command": "Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; 'port 3000 bebas'; Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; 'port 8080 bebas'; redis-cli -p 6379 shutdown 2>&1; 'semua mati'",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "save": "none",
+    "reveal_target": "dock",
+    "show_summary": false,
+    "show_command": false,
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
   }
 ]
