@@ -4,22 +4,25 @@
 #   make test-cache  test cache Redis saja, verbose
 #   make check       fmt + vet + test
 
+# Berurutan agar tidak berebut CPU: satu paket dan satu tes pada satu waktu.
+GOFLAGS_SEQ = -p 1 -parallel 1
+
 REDIS_TEST_ADDR ?= localhost:6379
 export REDIS_TEST_ADDR
 
 .PHONY: test test-v test-race test-cache vet fmt check
 
 test:
-	go test ./... -count=1
+	go test $(GOFLAGS_SEQ) ./... -count=1
 
 test-v:
-	go test ./... -count=1 -v
+	go test $(GOFLAGS_SEQ) ./... -count=1 -v
 
 test-race:
-	go test ./... -count=1 -race
+	go test $(GOFLAGS_SEQ) ./... -count=1 -race
 
 test-cache:
-	go test ./internal/app/api/middleware -run ResponseCache -count=1 -v
+	go test $(GOFLAGS_SEQ) ./internal/app/api/middleware -run ResponseCache -count=1 -v
 
 vet:
 	go vet ./...

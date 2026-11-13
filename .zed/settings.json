@@ -11,15 +11,24 @@
     "Go": {
       "tab_size": 4,
       "hard_tabs": true,
-      "format_on_save": "on"
+      "format_on_save": "on",
+      "code_actions_on_format": {
+        "source.organizeImports": true
+      }
     },
     "TSX": {
       "tab_size": 2,
-      "format_on_save": "on"
+      "format_on_save": "on",
+      "code_actions_on_format": {
+        "source.fixAll.eslint": true
+      }
     },
     "TypeScript": {
       "tab_size": 2,
-      "format_on_save": "on"
+      "format_on_save": "on",
+      "code_actions_on_format": {
+        "source.fixAll.eslint": true
+      }
     }
   },
   "lsp": {
@@ -28,6 +37,28 @@
         "staticcheck": true,
         "gofumpt": true
       }
+    }
+  },
+  "terminal": {
+    "shell": {
+      "program": "pwsh"
+    },
+    "working_directory": "current_project_directory"
+  },
+  "tasks": {
+    "prefer_lsp": true
+  },
+  "inlay_hints": {
+    "enabled": true
+  },
+  "diagnostics": {
+    "inline": {
+      "enabled": true
+    }
+  },
+  "git": {
+    "inline_blame": {
+      "enabled": true
     }
   }
 }

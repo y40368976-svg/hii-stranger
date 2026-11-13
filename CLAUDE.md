@@ -14,9 +14,10 @@ Sesi utama merencanakan, membagi kerja, dan menggabungkan hasil. Jangan membaca 
 
 Aturan pembagian:
 - Tugas kecil di satu area: kerjakan langsung atau pakai SATU agent. Jangan memanggil 3 agent untuk hal sepele; tiap agent mulai dari nol dan itu mahal.
-- Tugas lintas area: panggil agent yang diperlukan dalam SATU pesan supaya berjalan paralel.
+- Tugas lintas area: panggil agent SATU per SATU (berurutan), tunggu selesai sebelum memanggil berikutnya, supaya tidak berebut CPU. Urutan: `backend-go` (kontrak) → `frontend-next` → `qa-reviewer`.
 - Dua agent tidak boleh menulis file yang sama. Perubahan kontrak API hanya oleh `backend-go`; tetapkan bentuk request/response di brief sebelum memanggil kedua agent, supaya frontend tidak menunggu.
-- `qa-reviewer` dipanggil setelah ada perubahan, atau paralel untuk memeriksa area yang tidak sedang diubah.
+- `qa-reviewer` dipanggil setelah agent penulis selesai, tidak pernah bersamaan dengan agent lain.
+- CPU: jangan menjalankan dua build/test/lint sekaligus (mis. `go test` dan `pnpm lint` bersamaan). Satu perintah berat pada satu waktu; `ctx_batch` untuk perintah berat dijalankan satu-satu, bukan paralel. Backend sudah `-p 1 -parallel 1` lewat Makefile, frontend `maxWorkers: 1`; perintah `go test` langsung tambahkan `-p 1 -parallel 1`.
 - Lanjutkan agent yang sama (SendMessage) untuk revisi, jangan memanggil agent baru.
 
 Isi brief untuk sub-agent (singkat, lengkap): tujuan, file/folder terkait, kontrak API yang disepakati, kriteria selesai, perintah verifikasi.
