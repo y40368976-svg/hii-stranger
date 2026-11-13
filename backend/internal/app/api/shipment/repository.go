@@ -13,7 +13,11 @@ import (
 const (
 	foreignKeyViolation = "23503"
 
-	shipmentColumns = `id, order_id, courier_name, tracking_number, coverage_status, shipping_status, updated_at`
+	// courier_name tidak disimpan di shipments (SDD); diturunkan dari kurir
+	// pesanan: kode kurir (huruf besar) + layanan, mis. "JNE REG".
+	shipmentColumns = `id, order_id,
+		(SELECT upper(o.courier_code) || ' ' || o.courier_service FROM orders o WHERE o.id = shipments.order_id),
+		tracking_number, coverage_status, shipping_status, updated_at`
 )
 
 // Repository mengakses tabel shipments.
@@ -78,16 +82,15 @@ func upsert(ctx context.Context, q queryRower, s Shipment) (Shipment, bool, erro
 	var out Shipment
 	var created bool
 	err := q.QueryRow(ctx,
-		`INSERT INTO shipments (order_id, courier_name, tracking_number, coverage_status, shipping_status)
-		 VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO shipments (order_id, tracking_number, coverage_status, shipping_status)
+		 VALUES ($1, $2, $3, $4)
 		 ON CONFLICT (order_id) DO UPDATE
-		    SET courier_name = EXCLUDED.courier_name,
-		        tracking_number = EXCLUDED.tracking_number,
+		    SET tracking_number = EXCLUDED.tracking_number,
 		        coverage_status = EXCLUDED.coverage_status,
 		        shipping_status = EXCLUDED.shipping_status,
 		        updated_at = now()
 		 RETURNING `+shipmentColumns+`, (xmax = 0)`,
-		s.OrderID, s.CourierName, s.TrackingNumber, s.CoverageStatus, s.ShippingStatus,
+		s.OrderID, s.TrackingNumber, s.CoverageStatus, s.ShippingStatus,
 	).Scan(&out.ID, &out.OrderID, &out.CourierName, &out.TrackingNumber,
 		&out.CoverageStatus, &out.ShippingStatus, &out.UpdatedAt, &created)
 	if err != nil {

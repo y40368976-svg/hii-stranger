@@ -13,7 +13,11 @@ import (
 )
 
 const (
-	userColumns     = `id, name, email, password_hash, phone, role, status, email_verified_at, created_at`
+	// role dibaca sebagai kode dari tabel roles (users.role_id), sehingga
+	// struct User dan token tetap memakai kode role (customer, staff, owner).
+	userColumns = `id, name, email, password_hash, phone,
+		(SELECT r.code FROM roles r WHERE r.id = users.role_id) AS role,
+		status, email_verified_at, created_at`
 	uniqueViolation = "23505"
 	emailConstraint = "uq_users_email"
 )
@@ -32,8 +36,8 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 // bila email sudah ada.
 func (r *Repository) Create(ctx context.Context, u User) (User, error) {
 	row := r.db.QueryRow(ctx,
-		`INSERT INTO users (name, email, password_hash, phone, role, status)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		`INSERT INTO users (name, email, password_hash, phone, role_id, status)
+		 VALUES ($1, $2, $3, $4, (SELECT id FROM roles WHERE code = $5), $6)
 		 RETURNING `+userColumns,
 		u.Name, u.Email, u.PasswordHash, u.Phone, u.Role, u.Status)
 
@@ -139,7 +143,7 @@ func (r *Repository) List(ctx context.Context, f ListFilter) ([]User, int, error
 func (r *Repository) AdminUpdate(ctx context.Context, id string, c AdminChanges) (User, error) {
 	u, err := scanUser(r.db.QueryRow(ctx,
 		`UPDATE users
-		 SET role = COALESCE($2, role),
+		 SET role_id = COALESCE((SELECT id FROM roles WHERE code = $2), role_id),
 		     status = COALESCE($3, status)
 		 WHERE id = $1
 		 RETURNING `+userColumns,
@@ -223,7 +227,7 @@ func (f ListFilter) where() (string, []any) {
 		add(`(name ILIKE $%[1]d ESCAPE '\' OR email ILIKE $%[1]d ESCAPE '\')`, "%"+escapeLike(f.Q)+"%")
 	}
 	if f.Role != "" {
-		add(`role = $%d`, f.Role)
+		add(`role_id = (SELECT id FROM roles WHERE code = $%d)`, f.Role)
 	}
 	if f.Status != "" {
 		add(`status = $%d`, f.Status)

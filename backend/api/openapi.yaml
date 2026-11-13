@@ -21,16 +21,23 @@ info:
       Detail internal (stack trace, SQL, secret) tidak pernah dikirim ke client.
     - Autentikasi memakai header `Authorization: Bearer <JWT>`. `user_id` dan `role` selalu diambil dari token,
       tidak pernah dari body request.
-    - Peran: `public` (tanpa token), `customer`, `staff`, dan `admin`. Role dibaca dari token,
-      jadi perubahan role berlaku setelah user login ulang.
-      - `customer`: satu-satunya role yang boleh memakai keranjang, cek ongkir, checkout, membuat tagihan,
-        dan mengunggah bukti bayar. Admin/staff ditolak 403 (ditegakkan di server).
-      - `staff`: mengelola katalog, banner, pesanan, pembayaran, pengiriman, dan jurnal. Pengaturan toko dan pengguna hanya `admin`.
-      - `admin`: seluruh endpoint admin, tetapi tidak dapat berbelanja.
-      Resource milik user (cart, order, payment, shipment) hanya bisa diakses pemiliknya atau admin.
+    - Peran: `public` (tanpa token), `customer`, `staff`, dan `owner` (tabel `roles`, dirujuk `users.role_id`).
+      Role dibaca dari token, jadi perubahan role berlaku setelah user login ulang.
+      - `customer`: satu-satunya role yang boleh memakai keranjang, cek ongkir, checkout, daftar order sendiri,
+        membuat tagihan, dan mengunggah bukti bayar. Owner/staff ditolak 403 (ditegakkan di server).
+      - `staff`: mengelola katalog, banner, pesanan, pembayaran, pengiriman, dan jurnal. Pengaturan situs,
+        pengguna, dan analitik pendapatan hanya `owner`.
+      - `owner`: seluruh hak `staff` ditambah kelola pengguna, pengaturan situs, dan analitik; tidak dapat berbelanja.
+      Pada deskripsi endpoint, "admin" berarti `owner` atau `staff`.
+      Resource milik user (cart, order, payment, shipment) hanya bisa diakses pemiliknya, staff, atau owner.
+    - Mode maintenance ditegakkan server: saat `site_settings.maintenance_mode` aktif, semua request dijawab
+      503 dengan `error.code = maintenance` dan `error.message` berisi `maintenance_message`, kecuali request
+      dengan token `staff`/`owner` serta `GET /health`, `GET /site-settings`, `POST /auth/login`,
+      `POST /auth/password/forgot`, `POST /auth/password/reset`, `POST /auth/verify-email`, dan `GET /users/me`.
+      Perubahan status berlaku paling lambat 5 detik.
     - Checkout mewajibkan email terverifikasi (`email_verified_at` terisi); bila belum, server menjawab
       403 dengan `error.code = email_not_verified`.
-    - Semua ID memakai UUID, kecuali `site_settings` yang hanya satu baris (singleton).
+    - Semua ID memakai UUID. `site_settings` hanya berisi satu baris (dijaga indeks unik), sehingga endpoint-nya tidak memakai ID.
     - Pagination memakai `page` (mulai dari 1) dan `limit` (default 20, maksimum 100).
 
     ## Catatan terkait skema database
@@ -38,8 +45,10 @@ info:
       kesalahan pembulatan. `discount_percent` dikirim sebagai angka biasa.
     - Waktu (`created_at`, `updated_at`, `payment_due_at`, dst.) dikirim dalam format RFC 3339 (UTC).
     - Kolom `role`, `status`, `availability_type`, `order_status`, `payment.status`, `coverage_status`,
-      dan `shipping_status` adalah `TEXT`. `role`, `users.status`, `banners.placement`, dan `posts.status`
-      dibatasi CHECK constraint; nilai lain divalidasi aplikasi.
+      dan `shipping_status` adalah `TEXT`. `users.status` dan `posts.status` dibatasi CHECK constraint;
+      `role` diambil dari tabel `roles` dan `banners.placement` dari tabel `banner_placements` (kode
+      `hero`, `main`, `catalog`); nilai lain divalidasi aplikasi. Field `image_url` pada banner disimpan
+      di kolom `desktop_image_url`.
     - Ongkir dihitung lewat RajaOngkir sampai tingkat kelurahan. Client memilih wilayah dari `/regions/...`,
       mengecek pilihan kurir di `/shipping/costs`, lalu mengirim ID wilayah + kurir saat checkout. Server
       menghitung ulang ongkir dan menyimpan nama wilayah di order.
@@ -1047,8 +1056,8 @@ paths:
       summary: Ubah pengaturan situs
       description: |
         Hak akses: admin. Tabel hanya memiliki satu baris pengaturan (singleton), jadi endpoint ini
-        mengganti seluruh isinya. Saat maintenance aktif, endpoint publik lain boleh dibatasi oleh aplikasi,
-        tetapi `/auth/login`, `/site-settings`, dan semua endpoint admin tetap dapat diakses.
+        mengganti seluruh isinya. Saat maintenance aktif, server menjawab request pelanggan dan pengunjung
+        dengan 503 `maintenance` (lihat Konvensi), sedangkan staff dan owner tetap dilayani.
       requestBody:
         required: true
         content:
@@ -1329,7 +1338,7 @@ paths:
       tags: [Orders]
       operationId: listMyOrders
       summary: Daftar order milik user
-      description: "Hak akses: user yang login (hanya order miliknya sendiri), terbaru dulu."
+      description: "Hak akses: customer (hanya order miliknya sendiri), terbaru dulu. Owner/staff → 403; gunakan `/admin/orders`."
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/Limit"
@@ -1348,6 +1357,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
     post:
@@ -1471,6 +1482,7 @@ paths:
         processing -> shipped/cancelled; shipped -> completed (paid diatur lewat verifikasi pembayaran).
         Transisi tidak valid dijawab 409. Saat ke `shipped`, `tracking_number` wajib: data pengiriman ikut
         disimpan dalam transaksi yang sama dan pelanggan menerima email berisi status, kurir, dan no. resi.
+        Kurir selalu kurir pilihan pelanggan saat checkout (`courier_code` + `courier_service`).
         Pembatalan mengembalikan stok.
       requestBody:
         required: true
@@ -1566,8 +1578,9 @@ paths:
       operationId: getPaymentProof
       summary: Unduh bukti pembayaran
       description: |
-        Hak akses: pemilik order atau admin. Isi berasal dari kolom `proof_data`; `Content-Type` response
-        sama dengan `proof_type` yang tersimpan.
+        Hak akses: pemilik order, staff, atau owner. Berkas disimpan di Cloudinary (`payments.proof_url`) dan
+        diambil server lalu diteruskan, sehingga alamat Cloudinary tidak pernah dikirim ke client.
+        `Content-Type` response sama dengan `proof_type`.
       responses:
         "200":
           description: Berkas bukti pembayaran.
@@ -1599,7 +1612,8 @@ paths:
       operationId: uploadPaymentProof
       summary: Unggah bukti pembayaran
       description: |
-        Hak akses: customer pemilik order. Berkas disimpan di kolom `proof_data` dan tipenya di `proof_type`.
+        Hak akses: customer pemilik order. Berkas diunggah ke Cloudinary dan alamatnya disimpan di
+        `payments.proof_url`; bila Cloudinary belum dikonfigurasi, hasilnya 503.
         Tipe diperiksa dari isi berkas, bukan hanya dari header atau ekstensi. Batas ukuran ditetapkan server
         (disarankan 2 MB). Mengunggah ulang menggantikan bukti sebelumnya selama pembayaran belum disetujui.
       requestBody:
@@ -1640,6 +1654,8 @@ paths:
           $ref: "#/components/responses/UnsupportedMediaType"
         "500":
           $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /admin/payments:
     get:
@@ -2336,7 +2352,7 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     ServiceUnavailable:
-      description: Layanan pihak ketiga belum dikonfigurasi di server.
+      description: Layanan pihak ketiga belum dikonfigurasi di server, atau situs sedang maintenance (`error.code = maintenance`).
       content:
         application/json:
           schema:
@@ -3118,9 +3134,6 @@ components:
         order_status:
           type: string
           enum: [pending_payment, paid, processing, shipped, completed, cancelled]
-        shipping_province:
-          type: string
-          nullable: true
         shipping_district:
           type: string
           nullable: true
@@ -3201,6 +3214,10 @@ components:
           type: string
         size:
           type: string
+        color:
+          type: string
+          nullable: true
+          description: Salinan warna varian saat checkout (SDD D-14).
         unit_price:
           $ref: "#/components/schemas/Money"
         quantity:
@@ -3291,10 +3308,6 @@ components:
           type: string
           maxLength: 100
           description: No. resi dari kurir. Wajib bila `order_status` = shipped; diabaikan untuk status lain.
-        courier_name:
-          type: string
-          maxLength: 100
-          description: Nama kurir untuk resi (opsional). Default dari kurir saat checkout, misalnya "POS Reguler".
         reason:
           type: string
           maxLength: 300
@@ -3325,7 +3338,7 @@ components:
         proof_type:
           type: string
           nullable: true
-          description: Tipe MIME bukti pembayaran.
+          description: Tipe MIME bukti pembayaran, diturunkan dari ekstensi `proof_url`.
           example: image/jpeg
         has_proof:
           type: boolean
@@ -3404,6 +3417,8 @@ components:
           format: uuid
         courier_name:
           type: string
+          readOnly: true
+          description: Kurir pesanan (kode kurir huruf besar + layanan, mis. "JNE REG"), diturunkan dari order; tidak disimpan di tabel shipments.
         tracking_number:
           type: string
           nullable: true
@@ -3420,11 +3435,8 @@ components:
 
     ShipmentUpsert:
       type: object
-      required: [courier_name, coverage_status, shipping_status]
+      required: [coverage_status, shipping_status]
       properties:
-        courier_name:
-          type: string
-          minLength: 1
         tracking_number:
           type: string
           nullable: true

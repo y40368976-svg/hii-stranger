@@ -62,6 +62,9 @@ type handlers struct {
 	shipment    *shipment.Handler
 	upload      *upload.Handler
 	post        *post.Handler
+
+	// maintenance membaca status mode maintenance dari pengaturan situs.
+	maintenance middleware.MaintenanceStatus
 }
 
 // newRouter menyusun seluruh route dan middleware global. Route baru
@@ -78,7 +81,8 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 	cache := middleware.NewResponseCache(rdb, publicCacheTTL)
 	cached := cache.Cached()
 
-	mux := http.NewServeMux()
+	// Routing memakai Gin (lihat router.go); pola rute ditulis gaya net/http.
+	mux := newGinMux()
 	mux.HandleFunc("GET "+apiPrefix+"/health", health)
 
 	mux.Handle("POST "+apiPrefix+"/auth/register",
@@ -201,7 +205,7 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 
 	// Order: user melihat ordernya sendiri; admin lewat /admin/orders.
 	mux.Handle("GET "+apiPrefix+"/orders",
-		middleware.Chain(http.HandlerFunc(h.order.ListMine), authenticate))
+		middleware.Chain(http.HandlerFunc(h.order.ListMine), authenticate, requireCustomer))
 	mux.Handle("POST "+apiPrefix+"/orders",
 		middleware.Chain(http.HandlerFunc(h.order.Create), authenticate, requireCustomer))
 	mux.Handle("POST "+apiPrefix+"/orders/{orderId}/cancel",
@@ -263,12 +267,15 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 		middleware.Recover(),
 		middleware.Logger(),
 		middleware.CORS(cfg.FrontendURL),
+		// Mode maintenance ditegakkan di server: pelanggan dan pengunjung
+		// mendapat 503, staff dan owner tetap dilayani (SDD 3.5).
+		middleware.Maintenance(tokens, h.maintenance, apiPrefix, user.RoleOwner, user.RoleStaff),
 		// Login, profil, dan keranjang tidak mengubah produk/kategori/banner.
 		// Checkout & pembatalan (/orders) mengubah stok, jadi tetap mengosongkan cache.
 		cache.InvalidateOnWrite(apiPrefix+"/auth/", apiPrefix+"/users/me", apiPrefix+"/cart"),
 		middleware.MaxBody(cfg.MaxBodyBytes),
 		middleware.Timeout(cfg.HTTPRequestTimeout),
-		// Paling dalam supaya pola rute dari mux (r.Pattern) terbaca sebagai label.
+		// Paling dalam supaya pola rute dari router Gin (r.Pattern) terbaca sebagai label.
 		middleware.Metrics(),
 	)
 

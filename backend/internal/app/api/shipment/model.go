@@ -30,8 +30,10 @@ const (
 
 // Shipment adalah satu baris tabel shipments (schema Shipment).
 type Shipment struct {
-	ID             string    `json:"id"`
-	OrderID        string    `json:"order_id"`
+	ID      string `json:"id"`
+	OrderID string `json:"order_id"`
+	// CourierName hanya dibaca: kurir pesanan (orders.courier_code +
+	// courier_service), tidak disimpan di tabel shipments.
 	CourierName    string    `json:"courier_name"`
 	TrackingNumber *string   `json:"tracking_number"`
 	CoverageStatus string    `json:"coverage_status"`
@@ -41,7 +43,6 @@ type Shipment struct {
 
 // upsertRequest adalah body PUT /orders/{orderId}/shipment.
 type upsertRequest struct {
-	CourierName    string  `json:"courier_name"`
 	TrackingNumber *string `json:"tracking_number"`
 	CoverageStatus string  `json:"coverage_status"`
 	ShippingStatus string  `json:"shipping_status"`

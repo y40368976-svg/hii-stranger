@@ -126,8 +126,8 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 // AdminUpdateStatus melayani PUT /admin/orders/{orderId}/status (admin).
 // Saat mengubah ke shipped, admin wajib mengisi tracking_number (no. resi);
-// courier_name opsional (default kurir dari checkout). Pelanggan lalu
-// menerima email berisi status, kurir, dan no. resi.
+// kurir mengikuti pilihan saat checkout. Pelanggan lalu menerima email berisi
+// status, kurir, dan no. resi.
 func (h *Handler) AdminUpdateStatus(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("orderId")
 	if !validator.UUID(id) {
@@ -156,13 +156,8 @@ func (h *Handler) AdminUpdateStatus(w http.ResponseWriter, r *http.Request) {
 		if req.TrackingNumber != nil {
 			info.TrackingNumber = strings.TrimSpace(*req.TrackingNumber)
 		}
-		if req.CourierName != nil {
-			info.CourierName = strings.TrimSpace(*req.CourierName)
-		}
 		c.Check(validator.RuneLenBetween(info.TrackingNumber, 1, 100), "tracking_number",
 			"No. resi wajib diisi saat order dikirim, maksimal 100 karakter.")
-		c.Check(validator.RuneLenBetween(info.CourierName, 0, 100), "courier_name",
-			"Nama kurir maksimal 100 karakter.")
 		ship = &info
 	}
 	if errs := c.Errors(); len(errs) > 0 {

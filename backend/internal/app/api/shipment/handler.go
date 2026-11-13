@@ -57,7 +57,6 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 	}
 	s := Shipment{
 		OrderID:        orderID,
-		CourierName:    strings.TrimSpace(req.CourierName),
 		CoverageStatus: strings.TrimSpace(req.CoverageStatus),
 		ShippingStatus: strings.TrimSpace(req.ShippingStatus),
 	}
@@ -68,8 +67,6 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var c validator.Collector
-	c.Check(validator.RuneLenBetween(s.CourierName, 1, 100), "courier_name",
-		"courier_name wajib diisi, maksimal 100 karakter.")
 	c.Check(s.TrackingNumber == nil || validator.RuneLenBetween(*s.TrackingNumber, 1, 100),
 		"tracking_number", "tracking_number maksimal 100 karakter.")
 	c.Check(s.CoverageStatus == CoverageCovered || s.CoverageStatus == CoverageNotCovered,

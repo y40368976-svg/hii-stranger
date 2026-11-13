@@ -68,7 +68,7 @@ func TestListFilterWhere(t *testing.T) {
 		{
 			name:     "role and status",
 			filter:   ListFilter{Role: "owner", Status: "inactive"},
-			wantSQL:  " WHERE role = $1 AND status = $2",
+			wantSQL:  " WHERE role_id = (SELECT id FROM roles WHERE code = $1) AND status = $2",
 			wantArgs: []any{"owner", "inactive"},
 		},
 		{
@@ -80,7 +80,7 @@ func TestListFilterWhere(t *testing.T) {
 		{
 			name:     "search escapes like wildcards and keeps placeholder numbering",
 			filter:   ListFilter{Q: `a_b%`, Role: "owner"},
-			wantSQL:  ` WHERE (name ILIKE $1 ESCAPE '\' OR email ILIKE $1 ESCAPE '\') AND role = $2`,
+			wantSQL:  ` WHERE (name ILIKE $1 ESCAPE '\' OR email ILIKE $1 ESCAPE '\') AND role_id = (SELECT id FROM roles WHERE code = $2)`,
 			wantArgs: []any{`%a\_b\%%`, "owner"},
 		},
 		{

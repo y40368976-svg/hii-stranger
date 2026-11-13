@@ -11,8 +11,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const bannerColumns = `id, placement, title, subtitle, cta_label, image_url, mobile_image_url, link_url,
+// bannerColumns membaca kode penempatan dari banner_placements
+// (banners.placement_id) sehingga JSON API tetap memakai placement dan
+// image_url. Kolom gambar desktop di basis data bernama desktop_image_url.
+const bannerColumns = `id, (SELECT bp.code FROM banner_placements bp WHERE bp.id = banners.placement_id) AS placement,
+	title, subtitle, cta_label, desktop_image_url, mobile_image_url, link_url,
 	sort_order, is_active, starts_at, ends_at, created_at`
+
+// placementID mengubah kode penempatan menjadi id di banner_placements.
+const placementID = `(SELECT id FROM banner_placements WHERE code = $%d)`
 
 // Repository mengakses tabel banners.
 type Repository struct {
@@ -34,7 +41,7 @@ func (r *Repository) List(ctx context.Context, f ListFilter) ([]Banner, error) {
 	}
 	if f.Placement != "" {
 		args = append(args, f.Placement)
-		conds = append(conds, fmt.Sprintf("placement = $%d", len(args)))
+		conds = append(conds, fmt.Sprintf("placement_id = "+placementID, len(args)))
 	}
 	query := "SELECT " + bannerColumns + " FROM banners"
 	if len(conds) > 0 {
@@ -65,9 +72,9 @@ func (r *Repository) List(ctx context.Context, f ListFilter) ([]Banner, error) {
 // Create menyimpan banner baru.
 func (r *Repository) Create(ctx context.Context, b Banner) (Banner, error) {
 	created, err := scanBanner(r.db.QueryRow(ctx,
-		`INSERT INTO banners (placement, title, subtitle, cta_label, image_url, mobile_image_url,
+		`INSERT INTO banners (placement_id, title, subtitle, cta_label, desktop_image_url, mobile_image_url,
 		                      link_url, sort_order, is_active, starts_at, ends_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		 VALUES ((SELECT id FROM banner_placements WHERE code = $1), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		 RETURNING `+bannerColumns,
 		b.Placement, b.Title, b.Subtitle, b.CTALabel, b.ImageURL, b.MobileImageURL,
 		b.LinkURL, b.SortOrder, b.IsActive, b.StartsAt, b.EndsAt))
@@ -95,7 +102,7 @@ func (r *Repository) Get(ctx context.Context, id string) (Banner, error) {
 func (r *Repository) Save(ctx context.Context, b Banner) (Banner, error) {
 	out, err := scanBanner(r.db.QueryRow(ctx,
 		`UPDATE banners
-		    SET placement = $2, title = $3, subtitle = $4, cta_label = $5, image_url = $6,
+		    SET placement_id = (SELECT id FROM banner_placements WHERE code = $2), title = $3, subtitle = $4, cta_label = $5, desktop_image_url = $6,
 		        mobile_image_url = $7, link_url = $8, sort_order = $9, is_active = $10,
 		        starts_at = $11, ends_at = $12
 		  WHERE id = $1

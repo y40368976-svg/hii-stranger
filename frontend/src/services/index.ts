@@ -156,11 +156,11 @@ export const adminService = {
     api.list<ApiOrderListItem>("/admin/orders", query),
   updateOrderStatus: (
     id: string,
-    input: { order_status: string; tracking_number?: string; courier_name?: string; reason?: string }
+    input: { order_status: string; tracking_number?: string; reason?: string }
   ) => api.put<ApiOrder>("/admin/orders/" + id + "/status", input),
   upsertShipment: (
     orderId: string,
-    input: { courier_name: string; tracking_number: string | null; coverage_status: string; shipping_status: string }
+    input: { tracking_number: string | null; coverage_status: string; shipping_status: string }
   ) => api.put<ApiShipment>("/orders/" + orderId + "/shipment", input),
 
   payments: (query?: { status?: string; q?: string; page?: number; limit?: number }) =>
