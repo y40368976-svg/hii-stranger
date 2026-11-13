@@ -214,7 +214,7 @@
   },
   {
     "label": "postgres: start",
-    "command": "& \"$env:USERPROFILE\\postgres18\\bin\\pg_ctl.exe\" -D \"$env:USERPROFILE\\pgdata\" -l \"$env:USERPROFILE\\pgdata\\server.log\" start 2>&1 | Select-Object -Last 3",
+    "command": "pwsh -NoProfile -File .zed/dev.ps1 pg-start",
     "cwd": "$ZED_WORKTREE_ROOT",
     "save": "none",
     "show_summary": false,
@@ -222,7 +222,7 @@
   },
   {
     "label": "postgres: stop",
-    "command": "& \"$env:USERPROFILE\\postgres18\\bin\\pg_ctl.exe\" -D \"$env:USERPROFILE\\pgdata\" -m fast stop 2>&1 | Select-Object -Last 3",
+    "command": "pwsh -NoProfile -File .zed/dev.ps1 pg-stop",
     "cwd": "$ZED_WORKTREE_ROOT",
     "save": "none",
     "show_summary": false,
