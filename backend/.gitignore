@@ -4,3 +4,5 @@
 # Hasil build
 *.exe
 /bin/
+
+tmp/
