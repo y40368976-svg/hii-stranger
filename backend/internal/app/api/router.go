@@ -13,7 +13,7 @@ import (
 var paramPattern = regexp.MustCompile(`\{([A-Za-z0-9_]+)\}`)
 
 // ginMux adalah lapisan routing Gin yang tipis (SDD D-02): rute tetap
-// ditulis dengan pola net/http ("GET /api/v1/orders/{orderId}") dan handler
+// ditulis dengan pola net/http ("GET /api/v1.2.8/orders/{orderId}") dan handler
 // tetap http.Handler biasa, tetapi pencocokan rute dikerjakan Gin. Adaptor
 // mengisi r.PathValue dari parameter Gin dan r.Pattern dengan pola aslinya,
 // sehingga handler dan middleware (mis. label metrik) tidak perlu berubah.

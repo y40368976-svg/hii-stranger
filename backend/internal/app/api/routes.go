@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	apiPrefix = "/api/v1"
+	apiPrefix = "/api/v1.2.8"
 
 	// Batas percobaan login, register, dan ganti password per IP, untuk mempersulit tebak password.
 	authRateLimit          = 10

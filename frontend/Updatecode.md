@@ -125,7 +125,7 @@ Komponen checkout lama (`Billing`, `Shipping`, `ShippingMethod`, `PaymentMethod`
 1. Di folder `frontend`: `pnpm add react-redux @reduxjs/toolkit swiper react-hot-toast react-range-slider-input`
 2. Salin folder `public/images` dari template aslinya (lihat bagian 6).
 3. Siapkan backend: `cd backend`, salin `.env.example` ke `.env` (cek `DB_URL`, `JWT_SECRET≥32 karakter`, `REDIS_ADDR`, `FRONTEND_URL=http://localhost:3000` harus persis sama dengan alamat frontend), lalu `go run ./cmd/migration up` dan `go run ./cmd/api` (port 8080). Redis harus menyala.
-4. `frontend/.env.local` sudah berisi `NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1`. Biarkan bila backend jalan lokal.
+4. `frontend/.env.local` sudah berisi `NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1.2.8`. Biarkan bila backend jalan lokal.
 5. Di `frontend`: `pnpm dev`, lalu uji alur: daftar, login, lihat produk, tambah keranjang, checkout, buka detail pesanan, unggah bukti bayar.
 6. Sebelum deploy: `pnpm build` dan `pnpm lint` (warning boleh, error tidak).
 7. Folder `.next` lama sudah saya hapus; akan dibuat ulang otomatis.

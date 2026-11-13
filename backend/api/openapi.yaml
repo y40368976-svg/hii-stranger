@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: Hii Stranger Commerce API (Internal)
-  version: 2.0.0
+  version: 1.2.8
   license:
     name: Proprietary — seluruh hak dilindungi. Lihat berkas LICENSE di root repositori.
   x-confidentiality: internal
@@ -15,7 +15,7 @@ info:
     Kontrak REST API backend toko online. Skema disusun dari folder `migrations/`.
 
     ## Konvensi
-    - Base path `/api/v1`. Body request dan response berformat JSON, kecuali upload dan unduh bukti pembayaran.
+    - Base path `/api/v1.2.8`. Body request dan response berformat JSON, kecuali upload dan unduh bukti pembayaran.
     - Response sukses dibungkus `{ "data": ..., "meta": ... }`. `meta` hanya ada pada response daftar.
     - Response error selalu berbentuk `{ "error": { "code", "message", "details" } }`.
       Detail internal (stack trace, SQL, secret) tidak pernah dikirim ke client.
@@ -60,7 +60,7 @@ info:
     - Respons GET publik (produk, kategori, banner, jurnal, pengaturan) di-cache maksimal 30 detik.
 
 servers:
-  - url: /api/v1
+  - url: /api/v1.2.8
     description: Relatif terhadap host tempat API berjalan
 
 tags:

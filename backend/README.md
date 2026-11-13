@@ -1,7 +1,7 @@
 # Backend Hii Stranger
 
 REST API toko online (Go + PostgreSQL). Kontrak lengkap endpoint ada di
-[`api/openapi.yaml`](api/openapi.yaml); semua route berawalan `/api/v1`.
+[`api/openapi.yaml`](api/openapi.yaml); semua route berawalan `/api/v1.2.8`.
 
 ## Struktur folder
 

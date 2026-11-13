@@ -20,8 +20,9 @@ const minJWTSecretLen = 32
 
 // Config adalah seluruh konfigurasi yang dibutuhkan aplikasi saat ini.
 type Config struct {
-	AppEnv string
-	Port   string
+	AppEnv     string
+	AppVersion string
+	Port       string
 
 	DBURL              string
 	DBMaxConns         int32
@@ -82,9 +83,10 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
-		AppEnv: l.str("APP_ENV", "dev"),
-		Port:   l.str("PORT", "8080"),
-		DBURL:  l.required("DB_URL"),
+		AppEnv:     l.str("APP_ENV", "dev"),
+		AppVersion: l.str("APP_VERSION", "1.2.8"),
+		Port:       l.str("PORT", "8080"),
+		DBURL:      l.required("DB_URL"),
 		// Default 10 koneksi: hasil benchmark (4 core) paling stabil di kisaran
 		// 2-3x jumlah core. Lebih banyak tidak menambah kecepatan karena
 		// PostgreSQL sendiri dibatasi CPU.

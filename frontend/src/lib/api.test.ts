@@ -4,7 +4,7 @@ import { fetchCall, jsonResponse, mockFetch } from "@/test/fetch-mock";
 
 describe("API_URL", () => {
   it("memangkas garis miring di akhir NEXT_PUBLIC_API_URL", () => {
-    expect(API_URL).toBe("http://api.test/api/v1");
+    expect(API_URL).toBe("http://api.test/api/v1.2.8");
   });
 });
 
@@ -23,7 +23,7 @@ describe("request", () => {
     const f = mockFetch();
     await request("/products", { query: { q: "kaos", page: 2, empty: "", nil: null, undef: undefined, flag: false } });
     const { url, method } = fetchCall(f);
-    expect(url.origin + url.pathname).toBe("http://api.test/api/v1/products");
+    expect(url.origin + url.pathname).toBe("http://api.test/api/v1.2.8/products");
     expect(Object.fromEntries(url.searchParams)).toEqual({ q: "kaos", page: "2", flag: "false" });
     expect(method).toBe("GET");
   });
