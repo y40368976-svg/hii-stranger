@@ -57,7 +57,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("initialize redis: %w", err)
 	}
-	defer redisClient.Close()
+	defer func() { _ = redisClient.Close() }()
 	slog.Info(
 		"server starting",
 		"app", MyAppName,

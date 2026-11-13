@@ -291,7 +291,7 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]L
 	b.Queue(fmt.Sprintf(listSelect, orderColumns)+where+
 		fmt.Sprintf(" ORDER BY o.created_at DESC, o.id LIMIT $%d OFFSET $%d", len(pageArgs)-1, len(pageArgs)), pageArgs...)
 	br := r.db.SendBatch(ctx, b)
-	defer br.Close()
+	defer func() { _ = br.Close() }()
 
 	var total int
 	if err := br.QueryRow().Scan(&total); err != nil {
@@ -339,7 +339,7 @@ func (r *Repository) GetWithItems(ctx context.Context, id string) (Order, []Item
 	b.Queue("SELECT "+orderColumns+" FROM orders o WHERE o.id = $1", id)
 	b.Queue(itemsQuery, id)
 	br := r.db.SendBatch(ctx, b)
-	defer br.Close()
+	defer func() { _ = br.Close() }()
 
 	o, err := scanOrder(br.QueryRow())
 	if err != nil {
@@ -515,7 +515,7 @@ func (r *Repository) Summary(ctx context.Context) (Summary, error) {
 	          ORDER BY v.stock, p.name, v.size LIMIT 12`, lowStockThreshold)
 	b.Queue(fmt.Sprintf(listSelect, orderColumns) + " ORDER BY o.created_at DESC, o.id LIMIT 6")
 	br := r.db.SendBatch(ctx, b)
-	defer br.Close()
+	defer func() { _ = br.Close() }()
 
 	rows, err := br.Query()
 	if err != nil {

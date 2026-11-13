@@ -50,7 +50,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("koneksi database: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	var hasColumn bool
 	if err := conn.QueryRow(ctx,

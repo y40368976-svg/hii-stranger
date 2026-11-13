@@ -79,7 +79,7 @@ func (r *Repository) Analytics(ctx context.Context, prevStart, start, end time.T
 	          ORDER BY SUM(oi.subtotal) DESC, oi.product_name LIMIT 5`, start, end)
 	b.Queue(`SELECT order_status, COUNT(*) FROM orders WHERE created_at >= $1 AND created_at < $2 GROUP BY order_status`, start, end)
 	br := r.db.SendBatch(ctx, b)
-	defer br.Close()
+	defer func() { _ = br.Close() }()
 
 	for _, t := range []*AnalyticsTotals{&a.Current, &a.Previous} {
 		if err := br.QueryRow().Scan(&t.Revenue, &t.PaidOrders, &t.AllOrders, &t.Cancelled, &t.Buyers, &t.ItemsSold); err != nil {

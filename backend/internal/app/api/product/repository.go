@@ -116,7 +116,7 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]P
 	b.Queue("SELECT COUNT(*) FROM products"+where, args...)
 	b.Queue(query, pageArgs...)
 	br := r.db.SendBatch(ctx, b)
-	defer br.Close()
+	defer func() { _ = br.Close() }()
 
 	var total int
 	if err := br.QueryRow().Scan(&total); err != nil {
@@ -147,7 +147,7 @@ func (r *Repository) GetDetail(ctx context.Context, id string) (Product, []Varia
 	b.Queue("SELECT "+variantColumns+" FROM product_variants WHERE product_id = $1 ORDER BY sku, id", id)
 	b.Queue("SELECT "+imageColumns+" FROM product_images WHERE product_id = $1 ORDER BY sort_order, id", id)
 	br := r.db.SendBatch(ctx, b)
-	defer br.Close()
+	defer func() { _ = br.Close() }()
 
 	p, err := scanProduct(br.QueryRow())
 	if err != nil {

@@ -204,7 +204,7 @@ func (c *Client) do(ctx context.Context, method, path string, form url.Values, d
 	if err != nil {
 		return fmt.Errorf("rajaongkir: %s %s: %w", method, path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var env struct {
 		Meta struct {

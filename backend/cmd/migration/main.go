@@ -125,7 +125,7 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("koneksi database: %w", err)
 	}
-	defer conn.Close(context.Background())
+	defer func() { _ = conn.Close(context.Background()) }()
 
 	if cmd == "fresh" {
 		if err := dropAllTables(ctx, conn); err != nil {
@@ -141,7 +141,7 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	defer m.Close()
+	defer func() { _, _ = m.Close() }()
 
 	// Ctrl+C: golang-migrate berhenti setelah migrasi yang sedang berjalan.
 	go func() {
@@ -322,7 +322,7 @@ func up(m *migrate.Migrate, migrations []migration) error {
 	}
 	count := 0
 	for _, mg := range migrations {
-		if mg.version > before && mg.version <= after && !(dirty && mg.version == after) {
+		if mg.version > before && mg.version <= after && (!dirty || mg.version != after) {
 			fmt.Println("up  ", mg.label())
 			count++
 		}

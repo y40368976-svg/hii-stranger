@@ -97,7 +97,7 @@ func (c *Client) Fetch(ctx context.Context, rawURL string, maxBytes int64) ([]by
 	if err != nil {
 		return nil, fmt.Errorf("cloudinary: fetch: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("cloudinary: fetch status %d", resp.StatusCode)
 	}
@@ -162,7 +162,7 @@ func (c *Client) upload(ctx context.Context, resourceType, subfolder string, ext
 	if err != nil {
 		return "", fmt.Errorf("cloudinary: upload: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var out struct {
 		SecureURL string `json:"secure_url"`

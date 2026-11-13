@@ -26,7 +26,7 @@ type Response struct {
 
 // Response mengubah Category menjadi bentuk yang dikirim ke client.
 func (c Category) Response() Response {
-	return Response{ID: c.ID, Name: c.Name, IsActive: c.IsActive}
+	return Response(c)
 }
 
 // Changes adalah perubahan kategori yang sudah divalidasi. Field nil berarti
