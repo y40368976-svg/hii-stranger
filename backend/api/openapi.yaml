@@ -1243,6 +1243,20 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Cart]
+      operationId: clearCart
+      summary: Kosongkan keranjang
+      description: "Hak akses: customer (keranjang miliknya sendiri). Menghapus semua item; keranjang kosong tetap 204. Admin/staff ditolak 403."
+      responses:
+        "204":
+          description: Keranjang dikosongkan.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /cart/items:
     post:
@@ -1800,6 +1814,71 @@ paths:
           $ref: "#/components/responses/InternalError"
 
   # ------------------------------------------------- Verifikasi email
+  /auth/password/forgot:
+    post:
+      tags: [Auth]
+      operationId: forgotPassword
+      summary: Minta tautan reset kata sandi
+      description: |
+        Hak akses: public. Bila email terdaftar, server mengirim email berisi tautan
+        `<APP_URL>/reset-password?token=...` (token sekali pakai, berlaku 1 jam; permintaan baru
+        menggantikan token lama). Selalu 204 untuk email berformat valid, terdaftar atau tidak,
+        supaya keberadaan akun tidak bocor. Rate limit per IP lebih ketat daripada endpoint auth lain.
+        Tetap dapat dipakai saat mode maintenance.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "204":
+          description: Permintaan diterima (email dikirim bila akun ada).
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/password/reset:
+    post:
+      tags: [Auth]
+      operationId: resetPassword
+      summary: Setel kata sandi baru dari tautan reset
+      description: |
+        Hak akses: public. Token diambil dari query `token` pada halaman `/reset-password`.
+        Token tidak dikenal, sudah dipakai, atau kedaluwarsa dijawab 410 `reset_invalid`.
+        Setelah berhasil, pengguna login ulang dengan kata sandi baru. Dibatasi rate limit per IP.
+        Tetap dapat dipakai saat mode maintenance.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "204":
+          description: Kata sandi diperbarui.
+        "410":
+          description: Tautan reset tidak valid atau kedaluwarsa (`reset_invalid`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /auth/verify-email:
     post:
       tags: [Auth]
@@ -1934,6 +2013,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SummaryEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /admin/analytics:
+    get:
+      tags: [Admin]
+      operationId: adminAnalytics
+      summary: Laporan pendapatan (UC-19)
+      description: |
+        Hak akses: owner saja (staff ditolak 403). Laporan N hari terakhir (zona WIB, termasuk hari ini)
+        dibandingkan dengan N hari sebelumnya. Pendapatan dihitung dari order berstatus
+        paid, processing, shipped, atau completed.
+      parameters:
+        - name: days
+          in: query
+          required: false
+          schema:
+            type: integer
+            enum: [7, 30, 90]
+            default: 30
+      responses:
+        "200":
+          description: Laporan pendapatan.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -3604,7 +3716,7 @@ components:
     # ---------------------------------------------------- Role, admin, jurnal
     Role:
       type: string
-      enum: [customer, staff, admin]
+      enum: [customer, staff, owner]
 
     VerifyEmailRequest:
       type: object
@@ -3615,6 +3727,31 @@ components:
           minLength: 20
           maxLength: 200
           description: Token dari tautan `/verify-email?token=...` di email.
+
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Dinormalisasi (trim, huruf kecil) oleh server.
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, password]
+      properties:
+        token:
+          type: string
+          minLength: 20
+          maxLength: 200
+          description: Token dari tautan `/reset-password?token=...` di email.
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          description: Kata sandi baru (8 sampai 72 byte, batas bcrypt).
 
     OrderCancelRequest:
       type: object
@@ -3743,6 +3880,78 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/Summary"
+
+    AnalyticsTotals:
+      type: object
+      required: [revenue, paid_orders, all_orders, cancelled, buyers, items_sold]
+      properties:
+        revenue:
+          type: string
+          description: Rupiah dalam bentuk string desimal.
+          example: "1250000.00"
+        paid_orders:
+          type: integer
+        all_orders:
+          type: integer
+        cancelled:
+          type: integer
+        buyers:
+          type: integer
+        items_sold:
+          type: integer
+
+    Analytics:
+      type: object
+      required: [days, current, previous, series, top_products, statuses]
+      properties:
+        days:
+          type: integer
+          enum: [7, 30, 90]
+        current:
+          $ref: "#/components/schemas/AnalyticsTotals"
+        previous:
+          $ref: "#/components/schemas/AnalyticsTotals"
+        series:
+          type: array
+          description: Satu titik per hari (WIB).
+          items:
+            type: object
+            required: [date, revenue, orders]
+            properties:
+              date:
+                type: string
+                format: date
+              revenue:
+                type: string
+              orders:
+                type: integer
+        top_products:
+          type: array
+          items:
+            type: object
+            required: [product_id, name, quantity, revenue]
+            properties:
+              product_id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              quantity:
+                type: integer
+              revenue:
+                type: string
+        statuses:
+          type: object
+          description: Jumlah order per status pada periode berjalan.
+          additionalProperties:
+            type: integer
+
+    AnalyticsEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Analytics"
 
     PostEnvelope:
       type: object

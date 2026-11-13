@@ -132,7 +132,7 @@ func (m *Mailer) send(ctx context.Context, to, subject, body, htmlBody string) e
 		_ = conn.Close()
 		return fmt.Errorf("mailer: smtp client: %w", err)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	if m.port != "465" {
 		if ok, _ := c.Extension("STARTTLS"); ok {

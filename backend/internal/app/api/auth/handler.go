@@ -57,12 +57,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := h.svc.Register(r.Context(), RegisterInput{
-		Name:     req.Name,
-		Email:    req.Email,
-		Password: req.Password,
-		Phone:    req.Phone,
-	})
+	res, err := h.svc.Register(r.Context(), RegisterInput(req))
 	switch {
 	case errors.Is(err, user.ErrEmailTaken):
 		response.Error(w, http.StatusConflict, "conflict", "Email sudah terdaftar.")
