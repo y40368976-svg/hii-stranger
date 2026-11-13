@@ -381,11 +381,20 @@ const SHIP_STATUS = [
   { value: "returned", label: "Dikembalikan" },
 ];
 
+/** UC-15: staf menilai jangkauan ekspedisi ke wilayah tujuan (nilai sah backend: covered | not_covered). */
+const COVERAGE = [
+  { value: "covered", label: "Terjangkau ekspedisi" },
+  { value: "not_covered", label: "Tidak terjangkau ekspedisi" },
+];
+
 function ShipmentBox({ order: d, onChanged }: { order: ApiOrderDetail; onChanged: () => void }) {
   const s = d.shipment;
   const [edit, setEdit] = useState(false);
   const [resi, setResi] = useState(s?.tracking_number ?? "");
   const [status, setStatus] = useState(s?.shipping_status ?? "pending");
+  const [coverage, setCoverage] = useState(
+    s?.coverage_status === "covered" || s?.coverage_status === "not_covered" ? s.coverage_status : ""
+  );
   const [busy, setBusy] = useState(false);
   if (!s) return null;
   const links = trackingLinks(s.courier_name, s.tracking_number);
@@ -421,6 +430,24 @@ function ShipmentBox({ order: d, onChanged }: { order: ApiOrderDetail; onChanged
           <p className="text-sm">
             <span className="text-muted">Kurir:</span> <span className="font-semibold">{s.courier_name}</span>
           </p>
+          <p className="text-sm">
+            <span className="text-muted">Layanan:</span>{" "}
+            <span className="font-semibold">
+              {[d.courier_code?.toUpperCase(), d.courier_service].filter(Boolean).join(" ") || "-"}
+              {d.shipping_etd ? ` · estimasi ${d.shipping_etd}` : ""}
+            </span>
+          </p>
+          <p className="text-sm">
+            <span className="text-muted">Tujuan:</span> <span className="font-semibold">{joinAddress(d)}</span>
+          </p>
+          <Select
+            value={coverage}
+            onChange={setCoverage}
+            options={COVERAGE}
+            placeholder="Pilih jangkauan ekspedisi"
+            size="sm"
+            aria-label="Jangkauan ekspedisi"
+          />
           <Input className="h-10" value={resi} onChange={(e) => setResi(e.target.value)} placeholder="No. resi" aria-label="No. resi" />
           <Select value={status} onChange={setStatus} options={SHIP_STATUS} size="sm" aria-label="Status kirim" />
           <div className="flex gap-2">
@@ -431,10 +458,12 @@ function ShipmentBox({ order: d, onChanged }: { order: ApiOrderDetail; onChanged
               size="sm"
               variant="dark"
               loading={busy}
+              disabled={!coverage}
               onClick={async () => {
+                if (!coverage) return;
                 setBusy(true);
                 const ok = await run(
-                  () => adminService.upsertShipment(d.id, { tracking_number: resi.trim() || null, coverage_status: "covered", shipping_status: status }),
+                  () => adminService.upsertShipment(d.id, { tracking_number: resi.trim() || null, coverage_status: coverage, shipping_status: status }),
                   "Data pengiriman disimpan & email dikirim."
                 );
                 setBusy(false);
