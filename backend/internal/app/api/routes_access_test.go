@@ -57,39 +57,39 @@ func TestRouteRoleAccess(t *testing.T) {
 		want                     int
 	}{
 		// DELETE /cart dan item keranjang khusus pelanggan.
-		{http.MethodDelete, "/api/v1.2.8/cart", "", "", http.StatusUnauthorized},
-		{http.MethodDelete, "/api/v1.2.8/cart", "", "staff", http.StatusForbidden},
-		{http.MethodDelete, "/api/v1.2.8/cart", "", "owner", http.StatusForbidden},
-		{http.MethodGet, "/api/v1.2.8/cart", "", "owner", http.StatusForbidden},
-		{http.MethodPost, "/api/v1.2.8/cart/items", "{}", "staff", http.StatusForbidden},
-		{http.MethodPost, "/api/v1.2.8/cart/items", "{}", "customer", http.StatusUnprocessableEntity},
-		{http.MethodPatch, "/api/v1.2.8/cart/items/" + someUUID, "{}", "owner", http.StatusForbidden},
+		{http.MethodDelete, "/api/v1/cart", "", "", http.StatusUnauthorized},
+		{http.MethodDelete, "/api/v1/cart", "", "staff", http.StatusForbidden},
+		{http.MethodDelete, "/api/v1/cart", "", "owner", http.StatusForbidden},
+		{http.MethodGet, "/api/v1/cart", "", "owner", http.StatusForbidden},
+		{http.MethodPost, "/api/v1/cart/items", "{}", "staff", http.StatusForbidden},
+		{http.MethodPost, "/api/v1/cart/items", "{}", "customer", http.StatusUnprocessableEntity},
+		{http.MethodPatch, "/api/v1/cart/items/" + someUUID, "{}", "owner", http.StatusForbidden},
 
 		// Checkout dan unggah bukti khusus pelanggan.
-		{http.MethodPost, "/api/v1.2.8/orders", "{}", "staff", http.StatusForbidden},
-		{http.MethodPost, "/api/v1.2.8/orders", "{}", "customer", http.StatusUnprocessableEntity},
-		{http.MethodPut, "/api/v1.2.8/orders/" + someUUID + "/payment/proof", "", "staff", http.StatusForbidden},
+		{http.MethodPost, "/api/v1/orders", "{}", "staff", http.StatusForbidden},
+		{http.MethodPost, "/api/v1/orders", "{}", "customer", http.StatusUnprocessableEntity},
+		{http.MethodPut, "/api/v1/orders/" + someUUID + "/payment/proof", "", "staff", http.StatusForbidden},
 
 		// Review pembayaran oleh owner/staff.
-		{http.MethodPost, "/api/v1.2.8/admin/payments/" + someUUID + "/review", "{}", "customer", http.StatusForbidden},
-		{http.MethodPost, "/api/v1.2.8/admin/payments/" + someUUID + "/review", "{}", "staff", http.StatusUnprocessableEntity},
+		{http.MethodPost, "/api/v1/admin/payments/" + someUUID + "/review", "{}", "customer", http.StatusForbidden},
+		{http.MethodPost, "/api/v1/admin/payments/" + someUUID + "/review", "{}", "staff", http.StatusUnprocessableEntity},
 
 		// Upsert pengiriman oleh owner/staff.
-		{http.MethodPut, "/api/v1.2.8/orders/" + someUUID + "/shipment", "{}", "", http.StatusUnauthorized},
-		{http.MethodPut, "/api/v1.2.8/orders/" + someUUID + "/shipment", "{}", "customer", http.StatusForbidden},
-		{http.MethodPut, "/api/v1.2.8/orders/" + someUUID + "/shipment", "{}", "staff", http.StatusUnprocessableEntity},
-		{http.MethodPut, "/api/v1.2.8/orders/" + someUUID + "/shipment", "{}", "owner", http.StatusUnprocessableEntity},
+		{http.MethodPut, "/api/v1/orders/" + someUUID + "/shipment", "{}", "", http.StatusUnauthorized},
+		{http.MethodPut, "/api/v1/orders/" + someUUID + "/shipment", "{}", "customer", http.StatusForbidden},
+		{http.MethodPut, "/api/v1/orders/" + someUUID + "/shipment", "{}", "staff", http.StatusUnprocessableEntity},
+		{http.MethodPut, "/api/v1/orders/" + someUUID + "/shipment", "{}", "owner", http.StatusUnprocessableEntity},
 
 		// Pengaturan situs: owner saja.
-		{http.MethodPut, "/api/v1.2.8/site-settings", "{}", "staff", http.StatusForbidden},
-		{http.MethodPut, "/api/v1.2.8/site-settings", "{}", "customer", http.StatusForbidden},
-		{http.MethodPut, "/api/v1.2.8/site-settings", "{}", "owner", http.StatusUnprocessableEntity},
+		{http.MethodPut, "/api/v1/site-settings", "{}", "staff", http.StatusForbidden},
+		{http.MethodPut, "/api/v1/site-settings", "{}", "customer", http.StatusForbidden},
+		{http.MethodPut, "/api/v1/site-settings", "{}", "owner", http.StatusUnprocessableEntity},
 
 		// Analitik: owner saja; days selain 7/30/90 ditolak 400.
-		{http.MethodGet, "/api/v1.2.8/admin/analytics?days=7", "", "", http.StatusUnauthorized},
-		{http.MethodGet, "/api/v1.2.8/admin/analytics?days=7", "", "customer", http.StatusForbidden},
-		{http.MethodGet, "/api/v1.2.8/admin/analytics?days=7", "", "staff", http.StatusForbidden},
-		{http.MethodGet, "/api/v1.2.8/admin/analytics?days=5", "", "owner", http.StatusBadRequest},
+		{http.MethodGet, "/api/v1/admin/analytics?days=7", "", "", http.StatusUnauthorized},
+		{http.MethodGet, "/api/v1/admin/analytics?days=7", "", "customer", http.StatusForbidden},
+		{http.MethodGet, "/api/v1/admin/analytics?days=7", "", "staff", http.StatusForbidden},
+		{http.MethodGet, "/api/v1/admin/analytics?days=5", "", "owner", http.StatusBadRequest},
 	}
 	for _, tc := range tests {
 		name := tc.method + " " + tc.path + " as " + tc.role
@@ -114,7 +114,7 @@ func TestRouteRoleAccess(t *testing.T) {
 func TestForgotPasswordRateLimit(t *testing.T) {
 	router, _ := testRouter(t)
 	send := func() *httptest.ResponseRecorder {
-		req := httptest.NewRequest(http.MethodPost, "/api/v1.2.8/auth/password/forgot", strings.NewReader(`{"email":"x"}`))
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password/forgot", strings.NewReader(`{"email":"x"}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.RemoteAddr = "203.0.113.9:5555"
 		rec := httptest.NewRecorder()

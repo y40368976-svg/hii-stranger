@@ -3,7 +3,7 @@ import { adminService, authService, cartService, orderService, paymentService } 
 import { tokenStore } from "@/lib/api";
 import { fetchCall, mockFetch } from "@/test/fetch-mock";
 
-const BASE = "/api/v1.2.8";
+const BASE = "/api/v1";
 let f: ReturnType<typeof mockFetch>;
 
 beforeEach(() => {

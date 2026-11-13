@@ -31,23 +31,23 @@ func TestMaintenance(t *testing.T) {
 		auth       string
 		wantStatus int
 	}{
-		{"off lets everyone through", false, nil, http.MethodGet, "/api/v1.2.8/products", "", http.StatusOK},
-		{"on blocks visitor", true, nil, http.MethodGet, "/api/v1.2.8/products", "", http.StatusServiceUnavailable},
-		{"on blocks customer", true, nil, http.MethodPost, "/api/v1.2.8/orders", tokenFor("customer"), http.StatusServiceUnavailable},
-		{"on allows staff", true, nil, http.MethodGet, "/api/v1.2.8/admin/orders", tokenFor("staff"), http.StatusOK},
-		{"on allows owner", true, nil, http.MethodPut, "/api/v1.2.8/site-settings", tokenFor("owner"), http.StatusOK},
-		{"on keeps login open", true, nil, http.MethodPost, "/api/v1.2.8/auth/login", "", http.StatusOK},
-		{"on keeps site settings readable", true, nil, http.MethodGet, "/api/v1.2.8/site-settings", "", http.StatusOK},
-		{"on keeps health open", true, nil, http.MethodGet, "/api/v1.2.8/health", "", http.StatusOK},
-		{"on keeps preflight open", true, nil, http.MethodOptions, "/api/v1.2.8/cart", "", http.StatusOK},
-		{"on rejects invalid token", true, nil, http.MethodGet, "/api/v1.2.8/products", "Bearer rusak", http.StatusServiceUnavailable},
-		{"read error fails open", true, errors.New("db down"), http.MethodGet, "/api/v1.2.8/products", "", http.StatusOK},
+		{"off lets everyone through", false, nil, http.MethodGet, "/api/v1/products", "", http.StatusOK},
+		{"on blocks visitor", true, nil, http.MethodGet, "/api/v1/products", "", http.StatusServiceUnavailable},
+		{"on blocks customer", true, nil, http.MethodPost, "/api/v1/orders", tokenFor("customer"), http.StatusServiceUnavailable},
+		{"on allows staff", true, nil, http.MethodGet, "/api/v1/admin/orders", tokenFor("staff"), http.StatusOK},
+		{"on allows owner", true, nil, http.MethodPut, "/api/v1/site-settings", tokenFor("owner"), http.StatusOK},
+		{"on keeps login open", true, nil, http.MethodPost, "/api/v1/auth/login", "", http.StatusOK},
+		{"on keeps site settings readable", true, nil, http.MethodGet, "/api/v1/site-settings", "", http.StatusOK},
+		{"on keeps health open", true, nil, http.MethodGet, "/api/v1/health", "", http.StatusOK},
+		{"on keeps preflight open", true, nil, http.MethodOptions, "/api/v1/cart", "", http.StatusOK},
+		{"on rejects invalid token", true, nil, http.MethodGet, "/api/v1/products", "Bearer rusak", http.StatusServiceUnavailable},
+		{"read error fails open", true, errors.New("db down"), http.MethodGet, "/api/v1/products", "", http.StatusOK},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			status := func(context.Context) (bool, string, error) { return tc.on, "Sedang dirapikan", tc.readErr }
 			next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-			h := Maintenance(tokens, status, "/api/v1.2.8", "owner", "staff")(next)
+			h := Maintenance(tokens, status, "/api/v1", "owner", "staff")(next)
 
 			req := httptest.NewRequest(tc.method, tc.path, nil)
 			if tc.auth != "" {

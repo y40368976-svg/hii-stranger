@@ -15,7 +15,7 @@ info:
     Kontrak REST API backend toko online. Skema disusun dari folder `migrations/`.
 
     ## Konvensi
-    - Base path `/api/v1.2.8`. Body request dan response berformat JSON, kecuali upload dan unduh bukti pembayaran.
+    - Base path `/api/v1` (selalu mengarah ke versi terbaru). Versi lengkap juga dilayani di `/api/v<versi>` (mis. `/api/v1.2.8`); versi aktif ada di header `X-API-Version`. Body request dan response berformat JSON, kecuali upload dan unduh bukti pembayaran.
     - Response sukses dibungkus `{ "data": ..., "meta": ... }`. `meta` hanya ada pada response daftar.
     - Response error selalu berbentuk `{ "error": { "code", "message", "details" } }`.
       Detail internal (stack trace, SQL, secret) tidak pernah dikirim ke client.
@@ -60,7 +60,7 @@ info:
     - Respons GET publik (produk, kategori, banner, jurnal, pengaturan) di-cache maksimal 30 detik.
 
 servers:
-  - url: /api/v1.2.8
+  - url: /api/v1
     description: Relatif terhadap host tempat API berjalan
 
 tags:

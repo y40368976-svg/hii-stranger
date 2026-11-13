@@ -22,7 +22,9 @@ const minJWTSecretLen = 32
 type Config struct {
 	AppEnv     string
 	AppVersion string
-	Port       string
+	// LegacyAPIVersions: versi lama yang masih dilayani lewat /api/v<versi>.
+	LegacyAPIVersions []string
+	Port              string
 
 	DBURL              string
 	DBMaxConns         int32
@@ -83,10 +85,11 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
-		AppEnv:     l.str("APP_ENV", "dev"),
-		AppVersion: l.str("APP_VERSION", "1.2.8"),
-		Port:       l.str("PORT", "8080"),
-		DBURL:      l.required("DB_URL"),
+		AppEnv:            l.str("APP_ENV", "dev"),
+		AppVersion:        l.str("APP_VERSION", "1.2.8"),
+		LegacyAPIVersions: splitList(l.str("API_LEGACY_VERSIONS", "")),
+		Port:              l.str("PORT", "8080"),
+		DBURL:             l.required("DB_URL"),
 		// Default 10 koneksi: hasil benchmark (4 core) paling stabil di kisaran
 		// 2-3x jumlah core. Lebih banyak tidak menambah kecepatan karena
 		// PostgreSQL sendiri dibatasi CPU.
@@ -207,4 +210,15 @@ func (l *loader) duration(key string, def time.Duration) time.Duration {
 		return def
 	}
 	return d
+}
+
+// splitList memecah daftar dipisah koma, membuang spasi dan entri kosong.
+func splitList(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

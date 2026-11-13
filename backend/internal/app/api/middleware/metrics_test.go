@@ -43,8 +43,8 @@ func TestRouteLabel(t *testing.T) {
 	tests := map[string]string{
 		"":                       "unmatched",
 		"/":                      "/",
-		"GET /api/v1.2.8/products":   "/api/v1.2.8/products",
-		"POST /api/v1.2.8/cart/{id}": "/api/v1.2.8/cart/{id}",
+		"GET /api/v1/products":   "/api/v1/products",
+		"POST /api/v1/cart/{id}": "/api/v1/cart/{id}",
 	}
 	for in, want := range tests {
 		if got := routeLabel(in); got != want {

@@ -11,7 +11,7 @@ import (
 )
 
 // Metrik HTTP untuk Prometheus. Label route memakai pola rute (mis.
-// /api/v1.2.8/products/{productId}), bukan path asli, supaya jumlah seri tetap
+// /api/v1/products/{productId}), bukan path asli, supaya jumlah seri tetap
 // kecil walaupun ID di URL berbeda-beda.
 var (
 	httpRequests = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -59,7 +59,7 @@ func Metrics() Middleware {
 	}
 }
 
-// routeLabel membuang awalan method dari pola mux ("GET /api/v1.2.8/x" -> "/api/v1.2.8/x").
+// routeLabel membuang awalan method dari pola mux ("GET /api/v1/x" -> "/api/v1/x").
 // Pola kosong berarti mux tidak menemukan rute (mis. 405).
 func routeLabel(pattern string) string {
 	if pattern == "" {
