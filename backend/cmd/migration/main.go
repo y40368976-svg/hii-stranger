@@ -34,6 +34,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -341,9 +342,9 @@ func down(m *migrate.Migrate, migrations []migration, steps int) error {
 		return err
 	}
 	var done []migration
-	for i := len(migrations) - 1; i >= 0; i-- {
-		if migrations[i].version <= before {
-			done = append(done, migrations[i])
+	for _, i := range slices.Backward(migrations) {
+		if i.version <= before {
+			done = append(done, i)
 		}
 	}
 	if len(done) == 0 {
