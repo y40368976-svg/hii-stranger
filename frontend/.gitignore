@@ -42,4 +42,3 @@ yarn-error.log*
 next-env.d.ts
 
 # bahan referensi pihak ketiga (bukan bagian aplikasi)
-/rules-direction/
