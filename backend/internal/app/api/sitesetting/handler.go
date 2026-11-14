@@ -56,7 +56,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		"payment_window_hours", "Batas waktu bayar 1 sampai 168 jam.")
 	c.Check(req != (updateRequest{}), "body", "Isi minimal satu pengaturan.")
 	if errs := c.Errors(); len(errs) > 0 {
-		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 

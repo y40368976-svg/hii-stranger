@@ -141,3 +141,24 @@ func write(w http.ResponseWriter, status int, body any) {
 		slog.Debug("response: write body", "error", err)
 	}
 }
+
+// Helper error umum agar handler tidak menduplikasi.
+func ValidationFailed(w http.ResponseWriter, errs ...FieldError) {
+	Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+}
+
+func NotFound(w http.ResponseWriter) {
+	Error(w, http.StatusNotFound, "not_found", "Data tidak ditemukan.")
+}
+
+func Forbidden(w http.ResponseWriter) {
+	Error(w, http.StatusForbidden, "forbidden", "Anda tidak memiliki akses.")
+}
+
+func LoginRequired(w http.ResponseWriter) {
+	Error(w, http.StatusUnauthorized, "unauthorized", "Anda harus login terlebih dahulu.")
+}
+
+func Conflict(w http.ResponseWriter, msg string) {
+	Error(w, http.StatusConflict, "conflict", msg)
+}

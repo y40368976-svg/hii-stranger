@@ -88,7 +88,7 @@ func RequireRole(roles ...string) Middleware {
 				return
 			}
 			if !slices.Contains(roles, p.Role) {
-				response.Error(w, http.StatusForbidden, "forbidden", "Anda tidak memiliki akses.")
+				response.Forbidden(w)
 				return
 			}
 			next.ServeHTTP(w, r)

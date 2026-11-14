@@ -1,7 +1,7 @@
 ---
 name: frontend-next
 description: Mengerjakan semua perubahan kode di frontend/ (Next.js 16, React 19, Redux Toolkit, Tailwind 4). Pakai untuk halaman, komponen, state, dan integrasi API di sisi web.
-model: opus
+model: sonnet
 effort: medium
 ---
 

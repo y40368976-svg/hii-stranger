@@ -39,8 +39,6 @@ const (
 
 // Metode pembayaran yang diterima aplikasi.
 const (
-	MethodBankTransfer = "bank_transfer"
-	MethodEWallet      = "ewallet"
 	// MethodQRIS adalah satu-satunya metode untuk order baru: QRIS statis toko,
 	// nominal unik (total + kode unik) diverifikasi admin dari bukti bayar.
 	MethodQRIS = "qris"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hii-stranger1/backend/internal/pkg/database"
 	"math/big"
 	"strings"
 	"time"
@@ -143,8 +144,8 @@ func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, u
 		 RETURNING `+orderColumns,
 		orderNumber, userID, in.RecipientName, in.RecipientPhone, in.ShippingAddress,
 		a.City, a.District, a.Subdistrict,
-		a.SubdistrictID, nullIfEmpty(a.ZipCode),
-		ship.Option.CourierCode, ship.Option.Service, nullIfEmpty(ship.Option.ETD), ship.WeightGram,
+		a.SubdistrictID, database.NullIfEmpty(a.ZipCode),
+		ship.Option.CourierCode, ship.Option.Service, database.NullIfEmpty(ship.Option.ETD), ship.WeightGram,
 		subtotal.FloatString(2), cost, total.FloatString(2), StatusPendingPayment, window))
 	if err != nil {
 		return Order{}, wrap("checkout insert order", err)
@@ -278,7 +279,7 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]L
 		add("o.order_status = $?", f.Status)
 	}
 	if f.Q != "" {
-		add(`(o.order_number ILIKE $? ESCAPE '\' OR o.recipient_name ILIKE $? ESCAPE '\')`, "%"+escapeLike(f.Q)+"%")
+		add(`(o.order_number ILIKE $? ESCAPE '\' OR o.recipient_name ILIKE $? ESCAPE '\')`, "%"+database.EscapeLike(f.Q)+"%")
 	}
 	where := ""
 	if len(conds) > 0 {
@@ -595,17 +596,6 @@ func scanOrder(row pgx.Row) (Order, error) {
 		return Order{}, ErrNotFound
 	}
 	return o, err
-}
-
-func nullIfEmpty(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
-func escapeLike(s string) string {
-	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
 // paymentDeadlineLabel memformat batas bayar untuk email (WIB).

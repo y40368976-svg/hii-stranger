@@ -125,10 +125,7 @@ func scanCategory(row pgx.Row) (Category, error) {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Category{}, ErrNotFound
 	}
-	if err != nil {
-		return Category{}, err
-	}
-	return c, nil
+	return c, err
 }
 
 func isNameTaken(err error) bool {

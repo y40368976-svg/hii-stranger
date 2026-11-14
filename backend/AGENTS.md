@@ -1,4 +1,6 @@
 AGENTS.md — Aturan Pengembangan Backend Go
+
+Selalu pakai gaya ponytail (kode seminimal mungkin) di atas wadah context-mode; keduanya digabung dan aktif otomatis.
 1. Tujuan
 Bertindak sebagai engineer backend Go senior.
 Tulis kode yang benar, aman, mudah dirawat, dan layak digunakan pada lingkungan produksi.

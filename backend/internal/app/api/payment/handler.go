@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"hii-stranger1/backend/internal/app/api/middleware"
 	"hii-stranger1/backend/internal/app/api/user"
 	"hii-stranger1/backend/internal/pkg/fileupload"
 	"hii-stranger1/backend/internal/pkg/response"
@@ -59,7 +58,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		req.Method = MethodQRIS
 	}
 	if req.Method != MethodQRIS {
-		validationFailed(w, response.FieldError{Field: "method",
+		response.ValidationFailed(w, response.FieldError{Field: "method",
 			Message: "Pembayaran hanya melalui QRIS (method: " + MethodQRIS + ")."})
 		return
 	}
@@ -152,10 +151,10 @@ func (h *Handler) AdminList(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) AdminReview(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("paymentId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
-	uid, _ := principal(r)
+	uid, _ := user.Principal(r)
 
 	var req reviewRequest
 	if !response.Decode(w, r, &req) {
@@ -163,7 +162,7 @@ func (h *Handler) AdminReview(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Status = strings.TrimSpace(req.Status)
 	if req.Status != StatusApproved && req.Status != StatusRejected {
-		validationFailed(w, response.FieldError{Field: "status",
+		response.ValidationFailed(w, response.FieldError{Field: "status",
 			Message: "status harus " + StatusApproved + " atau " + StatusRejected + "."})
 		return
 	}
@@ -182,17 +181,17 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, op string, 
 	case err == nil:
 		return false
 	case errors.Is(err, ErrNotFound), errors.Is(err, ErrOrderNotFound):
-		notFound(w)
+		response.NotFound(w)
 	case errors.Is(err, ErrAlreadyExists):
-		conflict(w, "Order ini sudah memiliki pembayaran.")
+		response.Conflict(w, "Order ini sudah memiliki pembayaran.")
 	case errors.Is(err, ErrOrderNotPayable):
-		conflict(w, "Order tidak sedang menunggu pembayaran.")
+		response.Conflict(w, "Order tidak sedang menunggu pembayaran.")
 	case errors.Is(err, ErrAlreadyApproved):
-		conflict(w, "Pembayaran sudah disetujui sehingga bukti tidak bisa diganti.")
+		response.Conflict(w, "Pembayaran sudah disetujui sehingga bukti tidak bisa diganti.")
 	case errors.Is(err, ErrNoProof):
-		conflict(w, "Bukti pembayaran belum diunggah.")
+		response.Conflict(w, "Bukti pembayaran belum diunggah.")
 	case errors.Is(err, ErrAlreadyReviewed):
-		conflict(w, "Pembayaran sudah diverifikasi sebelumnya.")
+		response.Conflict(w, "Pembayaran sudah diverifikasi sebelumnya.")
 	case errors.Is(err, ErrStorageDisabled):
 		response.Error(w, http.StatusServiceUnavailable, "upload_unavailable",
 			"Layanan penyimpanan bukti pembayaran belum dikonfigurasi.")
@@ -208,38 +207,17 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, op string, 
 func orderRequest(w http.ResponseWriter, r *http.Request) (orderID, userID string, admin, ok bool) {
 	orderID = r.PathValue("orderId")
 	if !validator.UUID(orderID) {
-		notFound(w)
+		response.NotFound(w)
 		return "", "", false, false
 	}
-	userID, admin = principal(r)
+	userID, admin = user.Principal(r)
 	if userID == "" {
-		response.Error(w, http.StatusUnauthorized, "unauthorized", "Anda harus login terlebih dahulu.")
+		response.LoginRequired(w)
 		return "", "", false, false
 	}
 	return orderID, userID, admin, true
 }
 
-// principal mengambil ID user dan status admin dari authentication middleware.
-func principal(r *http.Request) (userID string, admin bool) {
-	p, ok := middleware.PrincipalFrom(r.Context())
-	if !ok {
-		return "", false
-	}
-	return p.UserID, user.IsBackoffice(p.Role)
-}
-
 func validStatus(s string) bool {
 	return s == StatusPending || s == StatusApproved || s == StatusRejected
-}
-
-func validationFailed(w http.ResponseWriter, errs ...response.FieldError) {
-	response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
-}
-
-func conflict(w http.ResponseWriter, msg string) {
-	response.Error(w, http.StatusConflict, "conflict", msg)
-}
-
-func notFound(w http.ResponseWriter) {
-	response.Error(w, http.StatusNotFound, "not_found", "Data tidak ditemukan.")
 }

@@ -4,12 +4,10 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
-	"hii-stranger1/backend/internal/app/api/middleware"
 	"hii-stranger1/backend/internal/app/api/user"
 	"hii-stranger1/backend/internal/pkg/response"
 	"hii-stranger1/backend/internal/pkg/validator"
@@ -26,9 +24,6 @@ const (
 	poMessage       = "po_estimate_days tidak boleh negatif."
 	preorderMessage = "po_estimate_days wajib diisi untuk produk preorder."
 )
-
-// moneyPattern sama dengan schema Money pada openapi.yaml.
-var moneyPattern = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?$`)
 
 // Handler melayani endpoint /products.
 type Handler struct {
@@ -78,9 +73,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "bad_request", msg)
 		return
 	}
-	admin := isAdmin(r)
+	admin := user.IsAdminRequest(r)
 	if f.Status != "" && !admin {
-		forbidden(w)
+		response.Forbidden(w)
 		return
 	}
 
@@ -103,14 +98,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("productId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
-	d, err := h.svc.GetDetail(r.Context(), id, isAdmin(r))
+	d, err := h.svc.GetDetail(r.Context(), id, user.IsAdminRequest(r))
 	switch {
 	case errors.Is(err, ErrNotFound):
-		notFound(w)
+		response.NotFound(w)
 	case err != nil:
 		slog.ErrorContext(r.Context(), "get product failed", "error", err)
 		response.Internal(w)
@@ -129,7 +124,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	req.Price = strings.TrimSpace(req.Price)
 
 	if errs := validateCreate(req); len(errs) > 0 {
-		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -158,7 +153,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("productId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -168,7 +163,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	changes, errs := req.changes()
 	if len(errs) > 0 {
-		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -183,14 +178,14 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("productId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
 	err := h.svc.Delete(r.Context(), id)
 	switch {
 	case errors.Is(err, ErrNotFound):
-		notFound(w)
+		response.NotFound(w)
 	case errors.Is(err, ErrInUse):
 		response.Error(w, http.StatusConflict, "conflict",
 			"Produk sudah pernah dipesan. Ubah statusnya menjadi inactive.")
@@ -209,7 +204,7 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, op string, 
 	case err == nil:
 		return false
 	case errors.Is(err, ErrNotFound):
-		notFound(w)
+		response.NotFound(w)
 	case errors.Is(err, ErrCategoryNotFound):
 		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.",
 			response.FieldError{Field: "category_id", Message: "Kategori tidak ditemukan."})
@@ -252,9 +247,9 @@ func parseFilter(r *http.Request) (Filter, string) {
 		return f, "Parameter availability_type tidak valid."
 	case f.Status != "" && !validStatus(f.Status):
 		return f, "Parameter status tidak valid."
-	case f.MinPrice != "" && !validPrice(f.MinPrice):
+	case f.MinPrice != "" && !validator.Money(f.MinPrice):
 		return f, "Parameter min_price tidak valid."
-	case f.MaxPrice != "" && !validPrice(f.MaxPrice):
+	case f.MaxPrice != "" && !validator.Money(f.MaxPrice):
 		return f, "Parameter max_price tidak valid."
 	}
 	if _, ok := orderBy[f.Sort]; !ok {
@@ -266,7 +261,7 @@ func parseFilter(r *http.Request) (Filter, string) {
 func validateCreate(req createRequest) []response.FieldError {
 	var c validator.Collector
 	c.Check(validator.RuneLenBetween(req.Name, 1, 200), "name", nameMessage)
-	c.Check(validPrice(req.Price), "price", priceMessage)
+	c.Check(validator.Money(req.Price), "price", priceMessage)
 	c.Check(req.DiscountPercent == nil || validDiscount(*req.DiscountPercent), "discount_percent", discountMessage)
 	c.Check(req.WeightGram >= 1, "weight_gram", weightMessage)
 	c.Check(validAvailability(req.AvailabilityType), "availability_type", availMessage)
@@ -299,7 +294,7 @@ func (req updateRequest) changes() (Changes, []response.FieldError) {
 	}
 	if req.Price != nil {
 		price := strings.TrimSpace(*req.Price)
-		c.Check(validPrice(price), "price", priceMessage)
+		c.Check(validator.Money(price), "price", priceMessage)
 		out.Price = &price
 	}
 	c.Check(req.CategoryID == nil || validator.UUID(*req.CategoryID), "category_id", categoryMessage)
@@ -313,10 +308,6 @@ func (req updateRequest) changes() (Changes, []response.FieldError) {
 	return out, c.Errors()
 }
 
-func validPrice(s string) bool {
-	return len(s) <= 20 && moneyPattern.MatchString(s)
-}
-
 func validDiscount(d float64) bool { return d >= 0 && d <= 100 }
 
 func validAvailability(s string) bool {
@@ -325,17 +316,4 @@ func validAvailability(s string) bool {
 
 func validStatus(s string) bool {
 	return s == StatusActive || s == StatusInactive
-}
-
-func isAdmin(r *http.Request) bool {
-	p, ok := middleware.PrincipalFrom(r.Context())
-	return ok && user.IsBackoffice(p.Role)
-}
-
-func notFound(w http.ResponseWriter) {
-	response.Error(w, http.StatusNotFound, "not_found", "Data tidak ditemukan.")
-}
-
-func forbidden(w http.ResponseWriter) {
-	response.Error(w, http.StatusForbidden, "forbidden", "Anda tidak memiliki akses.")
 }

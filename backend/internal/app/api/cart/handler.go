@@ -35,7 +35,7 @@ func userID(r *http.Request) string {
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	uid := userID(r)
 	if uid == "" {
-		unauthorized(w)
+		response.LoginRequired(w)
 		return
 	}
 
@@ -52,7 +52,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	uid := userID(r)
 	if uid == "" {
-		unauthorized(w)
+		response.LoginRequired(w)
 		return
 	}
 
@@ -64,7 +64,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	req.VariantID = strings.TrimSpace(req.VariantID)
 
 	if errs := validateCreate(req); len(errs) > 0 {
-		validationFailed(w, errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -80,13 +80,13 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	uid := userID(r)
 	if uid == "" {
-		unauthorized(w)
+		response.LoginRequired(w)
 		return
 	}
 
 	id := r.PathValue("cartItemId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if errs := validateUpdate(req); len(errs) > 0 {
-		validationFailed(w, errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -112,13 +112,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	uid := userID(r)
 	if uid == "" {
-		unauthorized(w)
+		response.LoginRequired(w)
 		return
 	}
 
 	id := r.PathValue("cartItemId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -134,7 +134,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Clear(w http.ResponseWriter, r *http.Request) {
 	uid := userID(r)
 	if uid == "" {
-		unauthorized(w)
+		response.LoginRequired(w)
 		return
 	}
 
@@ -159,16 +159,16 @@ func (h *Handler) writeError(
 		return false
 
 	case errors.Is(err, ErrNotFound):
-		notFound(w)
+		response.NotFound(w)
 
 	case errors.Is(err, ErrVariantNotFound):
-		validationFailed(w, response.FieldError{
+		response.ValidationFailed(w, response.FieldError{
 			Field:   "variant_id",
 			Message: "Variant tidak ditemukan.",
 		})
 
 	case errors.Is(err, ErrInvalidQuantity):
-		validationFailed(w, response.FieldError{
+		response.ValidationFailed(w, response.FieldError{
 			Field:   "quantity",
 			Message: "Quantity minimal 1.",
 		})
@@ -182,7 +182,7 @@ func (h *Handler) writeError(
 		)
 
 	case errors.Is(err, ErrUserNotFound):
-		unauthorized(w)
+		response.LoginRequired(w)
 
 	default:
 		slog.ErrorContext(r.Context(), op+" cart failed", "error", err)
@@ -223,32 +223,4 @@ func validateUpdate(req UpdateRequest) []response.FieldError {
 	c.Check(*req.Quantity >= 1, "quantity", "Quantity minimal 1.")
 
 	return c.Errors()
-}
-
-func validationFailed(w http.ResponseWriter, errs ...response.FieldError) {
-	response.Error(
-		w,
-		http.StatusUnprocessableEntity,
-		"validation_failed",
-		"Data tidak valid.",
-		errs...,
-	)
-}
-
-func notFound(w http.ResponseWriter) {
-	response.Error(
-		w,
-		http.StatusNotFound,
-		"not_found",
-		"Data tidak ditemukan.",
-	)
-}
-
-func unauthorized(w http.ResponseWriter) {
-	response.Error(
-		w,
-		http.StatusUnauthorized,
-		"unauthorized",
-		"Anda harus login terlebih dahulu.",
-	)
 }

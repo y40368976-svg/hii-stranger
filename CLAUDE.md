@@ -2,15 +2,20 @@
 
 Monorepo: `backend/` (Go, API) dan `frontend/` (Next.js 16, pnpm). Kontrak API: `backend/api/openapi.yaml`.
 
+Selalu pakai gaya ponytail (kode seminimal mungkin, seperti senior dev) di atas wadah context-mode; keduanya aktif otomatis, tanpa perlu dipanggil.
+
 ## Peran sesi utama (orkestrator)
 
 Sesi utama merencanakan, membagi kerja, dan menggabungkan hasil. Jangan membaca file besar atau menjalankan build/test sendiri; itu tugas sub-agent.
 
 | Agent | Area tulis | Model |
 |---|---|---|
-| `backend-go` | `backend/**` | opus |
-| `frontend-next` | `frontend/**` (kecuali `rules-direction/`) | opus |
+| `backend-go` | `backend/**` | sonnet |
+| `frontend-next` | `frontend/**` (kecuali `rules-direction/`) | sonnet |
 | `qa-reviewer` | tidak menulis kode | sonnet |
+| `dev` (default sesi) | `backend/**` dan `frontend/**` | sonnet |
+
+Default repo: agent `dev` (`.claude/settings.json` -> `"agent": "dev"`), gabungan ponytail + context-mode. Model default sonnet, effort medium; sub-agent ringan (cari/baca/rangkum) pakai haiku, tugas berat (arsitektur, debug lintas modul, refactor besar, review keamanan) boleh opus. Agent khusus di bawah dipakai bila perlu pemisahan area.
 
 Aturan pembagian:
 - Tugas kecil di satu area: kerjakan langsung atau pakai SATU agent. Jangan memanggil 3 agent untuk hal sepele; tiap agent mulai dari nol dan itu mahal.

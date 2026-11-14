@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hii-stranger1/backend/internal/pkg/database"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -237,10 +238,8 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]A
 	out := make([]AdminItem, 0, limit)
 	for rows.Next() {
 		var it AdminItem
-		p := &it.Payment
-		if err := rows.Scan(&p.ID, &p.OrderID, &p.Method, &p.Amount, &p.UniqueCode, &p.ProofType,
-			&p.HasProof, &p.Status, &p.PaidAt, &p.ReviewedBy, &p.ReviewedAt, &p.CreatedAt,
-			&it.OrderNumber, &it.OrderStatus, &it.OrderTotal, &it.PaymentDueAt, &it.CustomerName, &it.CustomerEmail); err != nil {
+		if err := rows.Scan(append(paymentDest(&it.Payment),
+			&it.OrderNumber, &it.OrderStatus, &it.OrderTotal, &it.PaymentDueAt, &it.CustomerName, &it.CustomerEmail)...); err != nil {
 			return nil, 0, wrap("list scan", err)
 		}
 		out = append(out, it)
@@ -268,17 +267,12 @@ func (f Filter) where() (string, []any) {
 	}
 	if f.Q != "" {
 		add(`(o.order_number ILIKE $%[1]d ESCAPE '\' OR p.id::text ILIKE $%[1]d ESCAPE '\'`+
-			` OR u.name ILIKE $%[1]d ESCAPE '\' OR u.email ILIKE $%[1]d ESCAPE '\')`, "%"+escapeLike(f.Q)+"%")
+			` OR u.name ILIKE $%[1]d ESCAPE '\' OR u.email ILIKE $%[1]d ESCAPE '\')`, "%"+database.EscapeLike(f.Q)+"%")
 	}
 	if len(conds) == 0 {
 		return "", nil
 	}
 	return " WHERE " + strings.Join(conds, " AND "), args
-}
-
-// escapeLike membuat %, _, dan \ dibaca apa adanya oleh ILIKE.
-func escapeLike(s string) string {
-	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
 func (r *Repository) Review(ctx context.Context, paymentID, adminID, status string) (Payment, error) {
@@ -351,10 +345,15 @@ func (r *Repository) contactOf(ctx context.Context, orderID string) (contact, er
 	return c, nil
 }
 
+// paymentDest adalah tujuan Scan dengan urutan yang sama dengan paymentColumns.
+func paymentDest(p *Payment) []any {
+	return []any{&p.ID, &p.OrderID, &p.Method, &p.Amount, &p.UniqueCode, &p.ProofType,
+		&p.HasProof, &p.Status, &p.PaidAt, &p.ReviewedBy, &p.ReviewedAt, &p.CreatedAt}
+}
+
 func scanPayment(row pgx.Row) (Payment, error) {
 	var p Payment
-	err := row.Scan(&p.ID, &p.OrderID, &p.Method, &p.Amount, &p.UniqueCode, &p.ProofType,
-		&p.HasProof, &p.Status, &p.PaidAt, &p.ReviewedBy, &p.ReviewedAt, &p.CreatedAt)
+	err := row.Scan(paymentDest(&p)...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Payment{}, ErrNotFound
 	}

@@ -213,7 +213,7 @@ func (s *Service) DeleteImage(ctx context.Context, productID, id string) error {
 func (h *Handler) CreateImage(w http.ResponseWriter, r *http.Request) {
 	productID := r.PathValue("productId")
 	if !validator.UUID(productID) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -223,7 +223,7 @@ func (h *Handler) CreateImage(w http.ResponseWriter, r *http.Request) {
 	}
 	req.ImageURL = strings.TrimSpace(req.ImageURL)
 	if !validator.HTTPURL(req.ImageURL) {
-		validationFailed(w, response.FieldError{Field: "image_url", Message: imageURLMessage})
+		response.ValidationFailed(w, response.FieldError{Field: "image_url", Message: imageURLMessage})
 		return
 	}
 
@@ -243,7 +243,7 @@ func (h *Handler) CreateImage(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateImage(w http.ResponseWriter, r *http.Request) {
 	productID, id := r.PathValue("productId"), r.PathValue("imageId")
 	if !validator.UUID(productID) || !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -261,7 +261,7 @@ func (h *Handler) UpdateImage(w http.ResponseWriter, r *http.Request) {
 	}
 	c.Check(ch != (ImageChanges{}), "body", "Isi minimal satu field yang ingin diubah.")
 	if errs := c.Errors(); len(errs) > 0 {
-		validationFailed(w, errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -276,7 +276,7 @@ func (h *Handler) UpdateImage(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteImage(w http.ResponseWriter, r *http.Request) {
 	productID, id := r.PathValue("productId"), r.PathValue("imageId")
 	if !validator.UUID(productID) || !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -294,7 +294,7 @@ func (h *Handler) writeImageError(w http.ResponseWriter, r *http.Request, op str
 	case err == nil:
 		return false
 	case errors.Is(err, ErrNotFound), errors.Is(err, ErrImageNotFound):
-		notFound(w)
+		response.NotFound(w)
 	default:
 		slog.ErrorContext(r.Context(), op+" image failed", "error", err)
 		response.Internal(w)

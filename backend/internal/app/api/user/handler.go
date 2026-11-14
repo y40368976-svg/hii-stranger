@@ -76,7 +76,7 @@ func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 
 	changes, errs := req.changes()
 	if len(errs) > 0 {
-		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -107,7 +107,7 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if errs := validateChangePassword(req); len(errs) > 0 {
-		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -206,14 +206,14 @@ func (h *Handler) AdminList(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) AdminGet(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("userId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
 	u, err := h.svc.Get(r.Context(), id)
 	switch {
 	case errors.Is(err, ErrNotFound):
-		notFound(w)
+		response.NotFound(w)
 	case err != nil:
 		slog.ErrorContext(r.Context(), "admin get user failed", "error", err)
 		response.Internal(w)
@@ -233,7 +233,7 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 
 	id := r.PathValue("userId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -244,16 +244,16 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 
 	changes, errs := req.changes()
 	if len(errs) > 0 {
-		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
 	u, err := h.svc.AdminUpdate(r.Context(), principal.UserID, id, changes)
 	switch {
 	case errors.Is(err, ErrNotFound):
-		notFound(w)
+		response.NotFound(w)
 	case errors.Is(err, ErrSelfLockout):
-		response.Error(w, http.StatusConflict, "conflict", "Anda tidak dapat menurunkan role atau menonaktifkan akun sendiri.")
+		response.Conflict(w, "Anda tidak dapat menurunkan role atau menonaktifkan akun sendiri.")
 	case err != nil:
 		slog.ErrorContext(r.Context(), "admin update user failed", "error", err)
 		response.Internal(w)
@@ -283,10 +283,21 @@ func (req adminUpdateRequest) changes() (AdminChanges, []response.FieldError) {
 	return out, c.Errors()
 }
 
-func notFound(w http.ResponseWriter) {
-	response.Error(w, http.StatusNotFound, "not_found", "Data tidak ditemukan.")
-}
-
 func unauthorized(w http.ResponseWriter) {
 	response.Error(w, http.StatusUnauthorized, "unauthorized", "Autentikasi diperlukan.")
+}
+
+// Principal mengambil ID user dan status backoffice dari middleware auth.
+func Principal(r *http.Request) (userID string, admin bool) {
+	p, ok := middleware.PrincipalFrom(r.Context())
+	if !ok {
+		return "", false
+	}
+	return p.UserID, IsBackoffice(p.Role)
+}
+
+// IsAdminRequest: request datang dari staf backoffice yang sudah login.
+func IsAdminRequest(r *http.Request) bool {
+	_, admin := Principal(r)
+	return admin
 }
