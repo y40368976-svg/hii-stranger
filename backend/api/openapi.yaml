@@ -35,6 +35,11 @@ info:
       dengan token `staff`/`owner` serta `GET /health`, `GET /site-settings`, `POST /auth/login`,
       `POST /auth/password/forgot`, `POST /auth/password/reset`, `POST /auth/verify-email`, dan `GET /users/me`.
       Perubahan status berlaku paling lambat 5 detik.
+    - Rate limit: selain batas auth/publik yang tercantum per endpoint, semua endpoint terautentikasi dibatasi
+      per user per menit (mutasi pelanggan 60, GET 120, upload gambar/bukti transfer 20, admin 120) dan
+      menjawab 429 `too_many_requests` dengan header `Retry-After`.
+    - Bila server sedang menangani terlalu banyak request bersamaan, semua endpoint kecuali `GET /health`
+      dapat menjawab 503 dengan `error.code = server_busy` dan header `Retry-After`.
     - Checkout mewajibkan email terverifikasi (`email_verified_at` terisi); bila belum, server menjawab
       403 dengan `error.code = email_not_verified`.
     - Semua ID memakai UUID. `site_settings` hanya berisi satu baris (dijaga indeks unik), sehingga endpoint-nya tidak memakai ID.
