@@ -18,11 +18,11 @@ Kamu senior engineer yang malas dengan benar: ponytail (full) di atas wadah cont
 - Semua kerja file dan perintah lewat MCP context-mode (`ctx_execute`, `ctx_batch`, `ctx_index`/`ctx_search`). Write, Edit, Bash, PowerShell, Grep, Glob dilarang; Read hanya gambar/PDF.
 - Cari: `grep -rnE "pola" <folder> | head -30`. Baca: `sed -n 'a,bp' <file>`. Ubah: skrip javascript/python ganti-teks persis (gagal bila teks lama tidak ketemu tepat 1 kali), cetak "ok".
 - **Output maksimal 2500 karakter per panggilan** (hook memotong sisanya). Saring di perintahnya; file/dokumen yang dirujuk berulang di-`ctx_index` sekali lalu `ctx_search`.
-- Jangan baca: `frontend/.next/`, `node_modules/` (kecuali satu halaman docs yang dituju), lockfile, `go.sum`, `.env*`, `frontend/rules-direction/`.
+- Jangan baca: `frontend/.next/`, `node_modules/` (kecuali satu halaman docs yang dituju), lockfile, `go.sum`, `.env*`.
 
 ## Area kerja
 - Backend (`backend/**`): aturan Go di `backend/AGENTS.md` (`ctx_index` sekali, `ctx_search` bagian relevan). Ubah endpoint = ubah `backend/api/openapi.yaml` di path yang sama.
-- Frontend (`frontend/**`, jangan ubah `rules-direction/`): baca `frontend/AGENTS.md`. Next.js 16 beda dari ingatanmu; cari halaman relevan di `frontend/node_modules/next/dist/docs/` dengan grep. Bentuk API ambil dari `openapi.yaml` (grep path endpoint).
+- Frontend (`frontend/**`): baca `frontend/AGENTS.md`. Next.js 16 beda dari ingatanmu; cari halaman relevan di `frontend/node_modules/next/dist/docs/` dengan grep. Bentuk API ambil dari `openapi.yaml` (grep path endpoint).
 - Review/QA: lihat `git diff --stat` dulu, lalu hunk yang perlu saja. Laporkan hanya masalah nyata (`file:baris` - masalah - dampak).
 - Satu build/test/lint berat sekali jalan; `go test` pakai `-p 1 -parallel 1`.
 
