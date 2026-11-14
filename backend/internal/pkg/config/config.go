@@ -39,6 +39,9 @@ type Config struct {
 	MaxBodyBytes       int64
 	HTTPRequestTimeout time.Duration
 	FrontendURL        string
+	// TrustProxyHeaders: baca IP klien dari CF-Connecting-IP / X-Real-IP /
+	// X-Forwarded-For. Aktifkan hanya di belakang proxy (mis. Railway).
+	TrustProxyHeaders bool
 
 	// SMTP untuk email notifikasi. SMTPHost kosong berarti email dimatikan.
 	SMTPHost   string
@@ -68,6 +71,10 @@ type Config struct {
 	RedisAddr     string
 	RedisPassword string
 	RedisDB       int
+
+	// MaxConcurrentRequests: batas request API yang diproses bersamaan
+	// (MAX_CONCURRENT_REQUESTS, default 200); 0 = nonaktif.
+	MaxConcurrentRequests int
 }
 
 // Load membaca dan memvalidasi konfigurasi. Semua masalah dilaporkan sekaligus
@@ -103,6 +110,7 @@ func Load() (Config, error) {
 		MaxBodyBytes:       l.integer("MAX_BODY_BYTES", 1<<20, 64),
 		HTTPRequestTimeout: l.duration("HTTP_REQUEST_TIMEOUT", 25*time.Second),
 		FrontendURL:        strings.TrimRight(l.str("FRONTEND_URL", ""), "/"),
+		TrustProxyHeaders:  l.boolean("TRUST_PROXY_HEADERS", false),
 
 		SMTPHost:   l.str("SMTP_HOST", ""),
 		SMTPPort:   l.str("SMTP_PORT", "587"),
@@ -124,6 +132,8 @@ func Load() (Config, error) {
 		RedisAddr:     l.str("REDIS_ADDR", "localhost:6379"),
 		RedisPassword: l.str("REDIS_PASSWORD", ""),
 		RedisDB:       int(l.integer("REDIS_DB", 0, 32)),
+
+		MaxConcurrentRequests: int(l.integer("MAX_CONCURRENT_REQUESTS", 200, 32)),
 	}
 
 	if port, err := strconv.Atoi(cfg.Port); err != nil || port < 1 || port > 65535 {
@@ -137,6 +147,9 @@ func Load() (Config, error) {
 	}
 	if cfg.DBMinConns < 0 || cfg.DBMinConns > cfg.DBMaxConns {
 		l.fail("DB_MIN_CONNS must be between 0 and DB_MAX_CONNS")
+	}
+	if cfg.MaxConcurrentRequests < 0 {
+		l.fail("MAX_CONCURRENT_REQUESTS must be 0 (disabled) or positive")
 	}
 	if cfg.MaxBodyBytes < 1 {
 		l.fail("MAX_BODY_BYTES must be at least 1")
@@ -199,6 +212,19 @@ func (l *loader) integer(key string, def int64, bits int) int64 {
 	return n
 }
 
+func (l *loader) boolean(key string, def bool) bool {
+	raw := l.str(key, "")
+	if raw == "" {
+		return def
+	}
+	b, err := strconv.ParseBool(raw)
+	if err != nil {
+		l.fail("%s must be a boolean (true/false)", key)
+		return def
+	}
+	return b
+}
+
 func (l *loader) duration(key string, def time.Duration) time.Duration {
 	raw := l.str(key, "")
 	if raw == "" {
@@ -215,8 +241,9 @@ func (l *loader) duration(key string, def time.Duration) time.Duration {
 // splitList memecah daftar dipisah koma, membuang spasi dan entri kosong.
 func splitList(s string) []string {
 	var out []string
-	for _, p := range strings.Split(s, ",") {
-		if p = strings.TrimSpace(p); p != "" {
+	for p := range strings.SplitSeq(s, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
 			out = append(out, p)
 		}
 	}

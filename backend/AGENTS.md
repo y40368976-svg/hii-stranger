@@ -116,6 +116,9 @@ Jauhkan secret dari source code, log, dan response API.
 Jangan mencatat password, access token, session cookie, atau private key.
 Atur CORS secara sengaja sesuai kebutuhan.
 Terapkan rate limiting jika model ancaman membutuhkannya.
+IP klien selalu lewat `middleware.ClientIP(r, cfg.TrustProxyHeaders)`; `TRUST_PROXY_HEADERS=true` hanya di belakang proxy (Railway).
+Header keamanan (nosniff, X-Frame-Options, CSP, Referrer-Policy, Permissions-Policy, HSTS khusus HTTPS) dipasang global oleh `middleware.SecurityHeaders`; `/metrics` di luar rantai API.
+Setiap rute terautentikasi baru wajib memakai limiter kelompoknya di `routes.go` (`userWriteLimit`, `userReadLimit`, `uploadLimit`, `adminLimit`, per user ID). `MAX_CONCURRENT_REQUESTS` (default 200, 0 = nonaktif) membatasi request bersamaan lewat `middleware.MaxConcurrent` (503 `server_busy`).
 Atur timeout yang sesuai untuk HTTP request ke layanan eksternal.
 Validasi tujuan redirect dan URL outbound jika relevan.
 Gunakan pengaturan cookie dan session yang aman jika digunakan.

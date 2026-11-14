@@ -2,7 +2,7 @@
 #   pwsh -NoProfile -File .zed/dev.ps1 start [dev|build]
 #   pwsh -NoProfile -File .zed/dev.ps1 stop
 param(
-    [ValidateSet('start', 'stop')][string]$Action = 'start',
+    [ValidateSet('start', 'stop', 'pg-start', 'pg-stop')][string]$Action = 'start',
     [ValidateSet('dev', 'build')][string]$Mode = 'dev'
 )
 $ErrorActionPreference = 'Stop'
@@ -25,6 +25,21 @@ function Start-Layanan([string]$Name, [int]$Port, [string]$Dir, [string]$Command
     "$Name dijalankan (port $Port)"
 }
 
+$pgBin = Join-Path $env:USERPROFILE 'postgres18\bin\pg_ctl.exe'
+$pgData = Join-Path $env:USERPROFILE 'pgdata'
+# Log di luar pgdata (kalau di dalam, fsync saat recovery kena sharing violation).
+$pgLog = Join-Path $env:USERPROFILE 'pg-server.log'
+
+function Start-Postgres {
+    if (Test-Port 5432) { 'postgres sudah jalan (port 5432)'; return }
+    # Jendela tersembunyi sendiri: terlepas dari terminal task Zed (Ctrl+C/tutup terminal tidak mematikannya).
+    Start-Process $pgBin -ArgumentList '-D', "`"$pgData`"", '-l', "`"$pgLog`"", '-w', '-t', '90', 'start' -WindowStyle Hidden -Wait | Out-Null
+    if (Test-Port 5432) { 'postgres dijalankan (port 5432)' } else { "postgres gagal start, lihat $pgLog" }
+}
+
+if ($Action -eq 'pg-start') { Start-Postgres; return }
+if ($Action -eq 'pg-stop') { & $pgBin -D $pgData -m fast stop 2>&1 | Select-Object -Last 3; 'postgres mati'; return }
+
 if ($Action -eq 'stop') {
     Stop-Port 3000; 'frontend mati'
     Get-Process air -ErrorAction SilentlyContinue | Stop-Process -Force
@@ -32,6 +47,8 @@ if ($Action -eq 'stop') {
     if (Test-Port 6379) { redis-cli -p 6379 shutdown 2>&1 | Out-Null }; 'redis mati'
     return
 }
+
+Start-Postgres
 
 if (Test-Port 6379) { 'redis sudah jalan (port 6379)' }
 else { Start-Process redis-server -ArgumentList '--port', '6379' -WindowStyle Hidden; 'redis dijalankan (port 6379)' }

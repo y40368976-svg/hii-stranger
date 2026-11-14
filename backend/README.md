@@ -50,6 +50,18 @@ go run ./cmd/migration up     # buat tabel
 go run ./cmd/api              # jalankan server di :8080
 ```
 
+**Di belakang proxy (Railway/Cloudflare)** – set `TRUST_PROXY_HEADERS=true`
+supaya rate limit memakai IP asli klien (`CF-Connecting-IP`, `X-Real-IP`,
+lalu elemen pertama `X-Forwarded-For`). Default `false`: hanya RemoteAddr;
+jangan aktifkan tanpa proxy karena header bisa dipalsukan klien. Flag ini juga
+membuat `X-Forwarded-Proto: https` dipercaya untuk header HSTS.
+
+**Batas beban** – rute terautentikasi dibatasi per user (cadangan per IP):
+mutasi pelanggan 60/menit, GET 120/menit, upload 20/menit, admin 120/menit
+(429 + `Retry-After`). `MAX_CONCURRENT_REQUESTS` (default 200, 0 = nonaktif)
+membatasi request bersamaan; bila penuh dijawab 503 `server_busy`. Health
+check dan `/metrics` tidak ikut dihitung.
+
 ## Layanan luar
 
 **Email (Gmail SMTP)** – isi `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`,
@@ -126,4 +138,6 @@ gofmt -l .        # cek format
 go vet ./...      # analisis statis
 go test ./...     # jalankan test
 go build ./...    # pastikan semua package bisa di-build
+go build -o NULL nama_file # build per field untuk mengetahui binary
+go run nama_nama # menjalankan perfile untuk cek output
 ```
