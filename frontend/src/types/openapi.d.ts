@@ -1544,7 +1544,7 @@ export interface components {
             /** @description Jumlah total barang (sum quantity). */
             item_count?: number;
             /** @enum {string|null} */
-            payment_status?: "pending" | "approved" | "rejected" | null;
+            payment_status?: "menunggu" | "valid" | "ditolak" | null;
             has_proof?: boolean;
             /** Format: email */
             customer_email?: string;
@@ -1622,7 +1622,7 @@ export interface components {
              * @description `pending` = menunggu bukti atau menunggu verifikasi (lihat `has_proof`).
              * @enum {string}
              */
-            status: "pending" | "approved" | "rejected";
+            status: "menunggu" | "valid" | "ditolak";
             /** Format: date-time */
             paid_at?: string | null;
             /**

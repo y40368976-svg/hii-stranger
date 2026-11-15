@@ -165,7 +165,7 @@ export const adminService = {
 
   payments: (query?: { status?: string; q?: string; page?: number; limit?: number }) =>
     api.list<ApiAdminPayment>("/admin/payments", query),
-  reviewPayment: (paymentId: string, status: "approved" | "rejected") =>
+  reviewPayment: (paymentId: string, status: "valid" | "ditolak") =>
     api.post<ApiPayment>("/admin/payments/" + paymentId + "/review", { status }),
 
   products: (query?: ProductQuery & { status?: string }) => api.list<ApiProduct>("/products", query),
