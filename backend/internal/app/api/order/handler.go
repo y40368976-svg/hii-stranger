@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"hii-stranger1/backend/internal/app/api/middleware"
 	"hii-stranger1/backend/internal/app/api/ongkir"
 	"hii-stranger1/backend/internal/app/api/user"
 	"hii-stranger1/backend/internal/pkg/response"
@@ -28,9 +27,9 @@ func NewHandler(svc *Service) *Handler {
 
 // ListMine melayani GET /orders: order milik user yang sedang login.
 func (h *Handler) ListMine(w http.ResponseWriter, r *http.Request) {
-	uid, _ := principal(r)
+	uid, _ := user.Principal(r)
 	if uid == "" {
-		unauthorized(w)
+		response.LoginRequired(w)
 		return
 	}
 	f, ok := parseFilter(w, r)
@@ -81,9 +80,9 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request, f Filter) {
 
 // Create melayani POST /orders: checkout dari keranjang.
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	uid, _ := principal(r)
+	uid, _ := user.Principal(r)
 	if uid == "" {
-		unauthorized(w)
+		response.LoginRequired(w)
 		return
 	}
 
@@ -93,7 +92,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	in, errs := req.input()
 	if len(errs) > 0 {
-		validationFailed(w, errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -108,12 +107,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("orderId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
-	uid, admin := principal(r)
+	uid, admin := user.Principal(r)
 	if uid == "" {
-		unauthorized(w)
+		response.LoginRequired(w)
 		return
 	}
 
@@ -131,7 +130,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) AdminUpdateStatus(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("orderId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -161,7 +160,7 @@ func (h *Handler) AdminUpdateStatus(w http.ResponseWriter, r *http.Request) {
 		ship = &info
 	}
 	if errs := c.Errors(); len(errs) > 0 {
-		validationFailed(w, errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -179,12 +178,12 @@ func (h *Handler) AdminUpdateStatus(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Cancel(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("orderId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
-	uid, _ := principal(r)
+	uid, _ := user.Principal(r)
 	if uid == "" {
-		unauthorized(w)
+		response.LoginRequired(w)
 		return
 	}
 	var req cancelRequest
@@ -195,7 +194,7 @@ func (h *Handler) Cancel(w http.ResponseWriter, r *http.Request) {
 	if req.Reason != nil {
 		if v := strings.TrimSpace(*req.Reason); v != "" {
 			if !validator.RuneLenBetween(v, 1, 300) {
-				validationFailed(w, response.FieldError{Field: "reason", Message: "Alasan maksimal 300 karakter."})
+				response.ValidationFailed(w, response.FieldError{Field: "reason", Message: "Alasan maksimal 300 karakter."})
 				return
 			}
 			reason = &v
@@ -213,12 +212,12 @@ func (h *Handler) Cancel(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Complete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("orderId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
-	uid, _ := principal(r)
+	uid, _ := user.Principal(r)
 	if uid == "" {
-		unauthorized(w)
+		response.LoginRequired(w)
 		return
 	}
 	o, err := h.svc.Complete(r.Context(), id, uid)
@@ -244,31 +243,31 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, op string, 
 	case err == nil:
 		return false
 	case errors.Is(err, ErrNotFound):
-		notFound(w)
+		response.NotFound(w)
 	case isOngkirError(err):
 		ongkir.WriteError(w, r, op+" order", err)
 	case errors.Is(err, ErrCartChanged):
-		conflict(w, "Isi keranjang berubah. Silakan cek ongkir ulang lalu checkout lagi.")
+		response.Conflict(w, "Isi keranjang berubah. Silakan cek ongkir ulang lalu checkout lagi.")
 	case errors.Is(err, ErrCartEmpty):
-		validationFailed(w, response.FieldError{Field: "cart_item_ids", Message: "Keranjang masih kosong."})
+		response.ValidationFailed(w, response.FieldError{Field: "cart_item_ids", Message: "Keranjang masih kosong."})
 	case errors.Is(err, ErrCartItemNotFound):
-		validationFailed(w, response.FieldError{Field: "cart_item_ids",
+		response.ValidationFailed(w, response.FieldError{Field: "cart_item_ids",
 			Message: "Ada item keranjang yang tidak ditemukan."})
 	case errors.Is(err, ErrProductUnavailable):
-		conflict(w, "Ada produk di keranjang yang sudah tidak tersedia.")
+		response.Conflict(w, "Ada produk di keranjang yang sudah tidak tersedia.")
 	case errors.Is(err, ErrInsufficientStock):
-		conflict(w, "Stok tidak mencukupi.")
+		response.Conflict(w, "Stok tidak mencukupi.")
 	case errors.Is(err, ErrTrackingRequired):
-		validationFailed(w, response.FieldError{Field: "tracking_number", Message: "No. resi wajib diisi."})
+		response.ValidationFailed(w, response.FieldError{Field: "tracking_number", Message: "No. resi wajib diisi."})
 	case errors.Is(err, ErrInvalidTransition):
-		conflict(w, "Perubahan status order tidak diizinkan.")
+		response.Conflict(w, "Perubahan status order tidak diizinkan.")
 	case errors.Is(err, ErrEmailNotVerified):
 		response.Error(w, http.StatusForbidden, "email_not_verified",
 			"Verifikasi email kamu terlebih dahulu sebelum membuat pesanan.")
 	case errors.Is(err, ErrNotCustomer):
 		response.Error(w, http.StatusForbidden, "forbidden", "Hanya akun pelanggan yang dapat membuat pesanan.")
 	case errors.Is(err, ErrProofUnderReview):
-		conflict(w, "Bukti pembayaran sedang diverifikasi admin, pesanan tidak dapat dibatalkan.")
+		response.Conflict(w, "Bukti pembayaran sedang diverifikasi admin, pesanan tidak dapat dibatalkan.")
 	default:
 		slog.ErrorContext(r.Context(), op+" order failed", "error", err)
 		response.Internal(w)
@@ -328,34 +327,9 @@ func parseFilter(w http.ResponseWriter, r *http.Request) (Filter, bool) {
 	return f, true
 }
 
-// principal mengambil ID user dan status admin dari authentication middleware.
-func principal(r *http.Request) (userID string, admin bool) {
-	p, ok := middleware.PrincipalFrom(r.Context())
-	if !ok {
-		return "", false
-	}
-	return p.UserID, user.IsBackoffice(p.Role)
-}
-
 // isOngkirError melaporkan apakah err berasal dari perhitungan ongkir.
 func isOngkirError(err error) bool {
 	return errors.Is(err, ongkir.ErrDisabled) || errors.Is(err, ongkir.ErrInvalidDestination) ||
 		errors.Is(err, ongkir.ErrNoRoute) ||
 		strings.HasPrefix(err.Error(), "rajaongkir:")
-}
-
-func validationFailed(w http.ResponseWriter, errs ...response.FieldError) {
-	response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
-}
-
-func conflict(w http.ResponseWriter, msg string) {
-	response.Error(w, http.StatusConflict, "conflict", msg)
-}
-
-func notFound(w http.ResponseWriter) {
-	response.Error(w, http.StatusNotFound, "not_found", "Data tidak ditemukan.")
-}
-
-func unauthorized(w http.ResponseWriter) {
-	response.Error(w, http.StatusUnauthorized, "unauthorized", "Anda harus login terlebih dahulu.")
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hii-stranger1/backend/internal/pkg/database"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -47,7 +48,7 @@ func (f ListFilter) where() (string, []any) {
 		add("lower(p.tag) = lower($?)", f.Tag)
 	}
 	if f.Q != "" {
-		add(`p.title ILIKE $? ESCAPE '\'`, "%"+escapeLike(f.Q)+"%")
+		add(`p.title ILIKE $? ESCAPE '\'`, "%"+database.EscapeLike(f.Q)+"%")
 	}
 	if len(conds) == 0 {
 		return "", nil
@@ -216,10 +217,6 @@ func readMinutes(chars int) int {
 		return 1
 	}
 	return m
-}
-
-func escapeLike(s string) string {
-	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
 func wrap(op string, err error) error {

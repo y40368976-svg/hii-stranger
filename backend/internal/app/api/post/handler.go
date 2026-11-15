@@ -114,7 +114,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		in.Slug = Slugify(in.Title)
 	}
 	if errs := validate(in); len(errs) > 0 {
-		validationFailed(w, errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 	d, err := h.svc.Create(r.Context(), p.UserID, in)
@@ -143,7 +143,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	})
 	var inv errInvalid
 	if errors.As(err, &inv) {
-		validationFailed(w, inv.fields...)
+		response.ValidationFailed(w, inv.fields...)
 		return
 	}
 	if h.writeError(w, r, "update", err) {
@@ -283,18 +283,14 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, op string, 
 	case errors.Is(err, ErrNotFound):
 		notFound(w)
 	case errors.Is(err, ErrSlugTaken):
-		response.Error(w, http.StatusConflict, "conflict", "Slug sudah dipakai artikel lain. Ganti slug.")
+		response.Conflict(w, "Slug sudah dipakai artikel lain. Ganti slug.")
 	case errors.Is(err, ErrProductNotFound):
-		validationFailed(w, response.FieldError{Field: "product_ids", Message: "Ada produk terkait yang tidak ditemukan."})
+		response.ValidationFailed(w, response.FieldError{Field: "product_ids", Message: "Ada produk terkait yang tidak ditemukan."})
 	default:
 		slog.ErrorContext(r.Context(), op+" post failed", "error", err)
 		response.Internal(w)
 	}
 	return true
-}
-
-func validationFailed(w http.ResponseWriter, errs ...response.FieldError) {
-	response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
 }
 
 func notFound(w http.ResponseWriter) {

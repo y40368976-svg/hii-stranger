@@ -53,14 +53,14 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if errs := validateRegister(req); len(errs) > 0 {
-		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
 	res, err := h.svc.Register(r.Context(), RegisterInput(req))
 	switch {
 	case errors.Is(err, user.ErrEmailTaken):
-		response.Error(w, http.StatusConflict, "conflict", "Email sudah terdaftar.")
+		response.Conflict(w, "Email sudah terdaftar.")
 	case err != nil:
 		slog.ErrorContext(r.Context(), "register failed", "error", err)
 		response.Internal(w)
@@ -78,7 +78,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	req.Email = normalizeEmail(req.Email)
 	if errs := validateLogin(req); len(errs) > 0 {
-		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -157,9 +157,9 @@ func (h *Handler) ResendVerification(w http.ResponseWriter, r *http.Request) {
 	err := h.svc.ResendVerification(r.Context(), p.UserID)
 	switch {
 	case errors.Is(err, ErrAlreadyVerified):
-		response.Error(w, http.StatusConflict, "conflict", "Email sudah terverifikasi.")
+		response.Conflict(w, "Email sudah terverifikasi.")
 	case errors.Is(err, user.ErrNotFound):
-		response.Error(w, http.StatusNotFound, "not_found", "Data tidak ditemukan.")
+		response.NotFound(w)
 	case err != nil:
 		slog.ErrorContext(r.Context(), "resend verification failed", "error", err)
 		response.Internal(w)
@@ -214,7 +214,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Token = strings.TrimSpace(req.Token)
 	if errs := validateResetPassword(req); len(errs) > 0 {
-		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 	err := h.svc.ResetPassword(r.Context(), req.Token, req.Password)

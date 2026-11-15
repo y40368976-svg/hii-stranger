@@ -1,0 +1,4 @@
+#!/bin/sh
+# Aktifkan sekali: git config core.hooksPath .githooks
+command -v gitleaks >/dev/null || { echo "gitleaks belum terpasang, scan secret dilewati"; exit 0; }
+gitleaks protect --staged --redact

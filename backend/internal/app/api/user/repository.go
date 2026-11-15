@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hii-stranger1/backend/internal/pkg/database"
 	"strings"
 	"time"
 
@@ -154,29 +155,10 @@ func (r *Repository) AdminUpdate(ctx context.Context, id string, c AdminChanges)
 	return u, nil
 }
 
-// where menyusun klausa WHERE dari filter. Hanya potongan SQL konstan yang
-// disambung; seluruh nilai dari client dikirim sebagai parameter.
 // SaveVerification menyimpan hash token verifikasi email baru untuk user dan
 // menghapus token lamanya, sehingga hanya tautan terbaru yang berlaku.
 func (r *Repository) SaveVerification(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return wrap("save verification begin", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	if _, err := tx.Exec(ctx, `DELETE FROM email_verifications WHERE user_id = $1`, userID); err != nil {
-		return wrap("save verification clear", err)
-	}
-	if _, err := tx.Exec(ctx,
-		`INSERT INTO email_verifications (token_hash, user_id, expires_at) VALUES ($1, $2, $3)`,
-		tokenHash, userID, expiresAt); err != nil {
-		return wrap("save verification insert", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return wrap("save verification commit", err)
-	}
-	return nil
+	return r.replaceToken(ctx, "email_verifications", "save verification", userID, tokenHash, expiresAt)
 }
 
 // ConsumeVerification menandai email user terverifikasi bila token masih
@@ -215,6 +197,8 @@ func (r *Repository) ConsumeVerification(ctx context.Context, tokenHash string) 
 	return u, nil
 }
 
+// where menyusun klausa WHERE dari filter. Hanya potongan SQL konstan yang
+// disambung; seluruh nilai dari client dikirim sebagai parameter.
 func (f ListFilter) where() (string, []any) {
 	var conds []string
 	var args []any
@@ -224,7 +208,7 @@ func (f ListFilter) where() (string, []any) {
 	}
 
 	if f.Q != "" {
-		add(`(name ILIKE $%[1]d ESCAPE '\' OR email ILIKE $%[1]d ESCAPE '\')`, "%"+escapeLike(f.Q)+"%")
+		add(`(name ILIKE $%[1]d ESCAPE '\' OR email ILIKE $%[1]d ESCAPE '\')`, "%"+database.EscapeLike(f.Q)+"%")
 	}
 	if f.Role != "" {
 		add(`role_id = (SELECT id FROM roles WHERE code = $%d)`, f.Role)
@@ -239,22 +223,13 @@ func (f ListFilter) where() (string, []any) {
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
-// escapeLike menetralkan karakter khusus LIKE agar pencarian "50%" benar-benar
-// mencari teks tersebut, bukan pola.
-func escapeLike(s string) string {
-	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
-}
-
 func scanUser(row pgx.Row) (User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.Name, &u.Email, &u.PasswordHash, &u.Phone, &u.Role, &u.Status, &u.EmailVerifiedAt, &u.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
-	if err != nil {
-		return User{}, err
-	}
-	return u, nil
+	return u, err
 }
 
 // wrap menambahkan konteks operasi, tetapi membiarkan error domain tetap utuh
@@ -269,22 +244,28 @@ func wrap(op string, err error) error {
 // SavePasswordReset menyimpan hash token reset password baru dan menghapus
 // token lama user, sehingga hanya tautan terbaru yang berlaku.
 func (r *Repository) SavePasswordReset(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error {
+	return r.replaceToken(ctx, "password_resets", "save password reset", userID, tokenHash, expiresAt)
+}
+
+// replaceToken menghapus token lama user di table lalu menyimpan hash token
+// baru dalam satu transaksi. table selalu konstanta dari pemanggil.
+func (r *Repository) replaceToken(ctx context.Context, table, op, userID, tokenHash string, expiresAt time.Time) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return wrap("save password reset begin", err)
+		return wrap(op+" begin", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if _, err := tx.Exec(ctx, `DELETE FROM password_resets WHERE user_id = $1`, userID); err != nil {
-		return wrap("save password reset clear", err)
+	if _, err := tx.Exec(ctx, `DELETE FROM `+table+` WHERE user_id = $1`, userID); err != nil {
+		return wrap(op+" clear", err)
 	}
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, $3)`,
+		`INSERT INTO `+table+` (token_hash, user_id, expires_at) VALUES ($1, $2, $3)`,
 		tokenHash, userID, expiresAt); err != nil {
-		return wrap("save password reset insert", err)
+		return wrap(op+" insert", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return wrap("save password reset commit", err)
+		return wrap(op+" commit", err)
 	}
 	return nil
 }

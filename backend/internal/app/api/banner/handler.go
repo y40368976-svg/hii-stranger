@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"hii-stranger1/backend/internal/app/api/middleware"
 	"hii-stranger1/backend/internal/app/api/user"
 	"hii-stranger1/backend/internal/pkg/response"
 	"hii-stranger1/backend/internal/pkg/validator"
@@ -44,8 +43,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		}
 		f.All = b
 	}
-	if f.All && !isAdmin(r) {
-		response.Error(w, http.StatusForbidden, "forbidden", "Anda tidak memiliki akses.")
+	if f.All && !user.IsAdminRequest(r) {
+		response.Forbidden(w)
 		return
 	}
 	banners, err := h.svc.List(r.Context(), f)
@@ -65,13 +64,13 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	ch, errs := req.changes(true)
 	if len(errs) > 0 {
-		validationFailed(w, errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 	b := Banner{Placement: PlacementHero, IsActive: true}
 	ch.apply(&b)
 	if err := checkSchedule(b); err != nil {
-		validationFailed(w, scheduleError())
+		response.ValidationFailed(w, scheduleError())
 		return
 	}
 	created, err := h.svc.Create(r.Context(), b)
@@ -86,7 +85,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("bannerId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 	var req request
@@ -95,12 +94,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	ch, errs := req.changes(false)
 	if len(errs) > 0 {
-		validationFailed(w, errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 	b, err := h.svc.Update(r.Context(), id, ch, checkSchedule)
 	if errors.Is(err, errSchedule) {
-		validationFailed(w, scheduleError())
+		response.ValidationFailed(w, scheduleError())
 		return
 	}
 	if h.writeError(w, r, "update", err) {
@@ -113,7 +112,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("bannerId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 	err := h.svc.Delete(r.Context(), id)
@@ -204,23 +203,10 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, op string, 
 	case err == nil:
 		return false
 	case errors.Is(err, ErrNotFound):
-		notFound(w)
+		response.NotFound(w)
 	default:
 		slog.ErrorContext(r.Context(), op+" banner failed", "error", err)
 		response.Internal(w)
 	}
 	return true
-}
-
-func isAdmin(r *http.Request) bool {
-	p, ok := middleware.PrincipalFrom(r.Context())
-	return ok && user.IsBackoffice(p.Role)
-}
-
-func validationFailed(w http.ResponseWriter, errs ...response.FieldError) {
-	response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
-}
-
-func notFound(w http.ResponseWriter) {
-	response.Error(w, http.StatusNotFound, "not_found", "Data tidak ditemukan.")
 }

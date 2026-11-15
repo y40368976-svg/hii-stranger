@@ -3302,7 +3302,7 @@ components:
               description: Jumlah total barang (sum quantity).
             payment_status:
               type: string
-              enum: [pending, approved, rejected]
+              enum: [menunggu, valid, ditolak]
               nullable: true
             has_proof:
               type: boolean
@@ -3463,8 +3463,8 @@ components:
           description: Diturunkan dari keberadaan `proof_data`.
         status:
           type: string
-          enum: [pending, approved, rejected]
-          description: "`pending` = menunggu bukti atau menunggu verifikasi (lihat `has_proof`)."
+          enum: [menunggu, valid, ditolak]
+          description: "`menunggu` = menunggu bukti atau menunggu verifikasi (lihat `has_proof`)."
         paid_at:
           type: string
           format: date-time

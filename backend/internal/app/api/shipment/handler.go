@@ -26,12 +26,12 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	orderID := r.PathValue("orderId")
 	if !validator.UUID(orderID) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 	p, ok := middleware.PrincipalFrom(r.Context())
 	if !ok {
-		response.Error(w, http.StatusUnauthorized, "unauthorized", "Anda harus login terlebih dahulu.")
+		response.LoginRequired(w)
 		return
 	}
 
@@ -47,7 +47,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 	orderID := r.PathValue("orderId")
 	if !validator.UUID(orderID) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -73,8 +73,10 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		"coverage_status", "coverage_status harus covered atau not_covered.")
 	c.Check(validShipping(s.ShippingStatus), "shipping_status",
 		"shipping_status harus pending, shipped, delivered, atau returned.")
+	c.Check(s.ShippingStatus != ShippingShipped || (s.TrackingNumber != nil && *s.TrackingNumber != ""),
+		"tracking_number", "tracking_number wajib diisi bila shipping_status shipped.")
 	if errs := c.Errors(); len(errs) > 0 {
-		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -96,7 +98,9 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, op string, 
 	case err == nil:
 		return false
 	case errors.Is(err, ErrNotFound), errors.Is(err, ErrOrderNotFound):
-		notFound(w)
+		response.NotFound(w)
+	case errors.Is(err, ErrOrderNotShippable):
+		response.Conflict(w, "Pesanan belum dibayar atau sudah dibatalkan.")
 	default:
 		slog.ErrorContext(r.Context(), op+" shipment failed", "error", err)
 		response.Internal(w)
@@ -110,8 +114,4 @@ func validShipping(s string) bool {
 		return true
 	}
 	return false
-}
-
-func notFound(w http.ResponseWriter) {
-	response.Error(w, http.StatusNotFound, "not_found", "Data tidak ditemukan.")
 }

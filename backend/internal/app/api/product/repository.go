@@ -235,7 +235,9 @@ func (r *Repository) Update(ctx context.Context, id string, ch Changes) (Product
 	if ch.AvailabilityType != nil {
 		set("availability_type", *ch.AvailabilityType, "")
 	}
-	if ch.PoEstimateDays != nil {
+	if ch.AvailabilityType != nil && *ch.AvailabilityType != AvailabilityPreorder {
+		sets = append(sets, "po_estimate_days = NULL") // ready stock: estimasi kosong (SDD 5.3)
+	} else if ch.PoEstimateDays != nil {
 		set("po_estimate_days", *ch.PoEstimateDays, "")
 	}
 	if ch.Status != nil {
@@ -270,25 +272,24 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+func productDest(p *Product) []any {
+	return []any{&p.ID, &p.CategoryID, &p.Name, &p.Description, &p.Price,
+		&p.DiscountPercent, &p.WeightGram, &p.AvailabilityType, &p.PoEstimateDays, &p.Status}
+}
+
 func scanProduct(row pgx.Row) (Product, error) {
 	var p Product
-	err := row.Scan(&p.ID, &p.CategoryID, &p.Name, &p.Description, &p.Price,
-		&p.DiscountPercent, &p.WeightGram, &p.AvailabilityType, &p.PoEstimateDays, &p.Status)
+	err := row.Scan(productDest(&p)...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Product{}, ErrNotFound
 	}
-	if err != nil {
-		return Product{}, err
-	}
-	return p, nil
+	return p, err
 }
 
 // scanListProduct sama dengan scanProduct ditambah kolom gambar utama.
 func scanListProduct(row pgx.Row) (Product, error) {
 	var p Product
-	err := row.Scan(&p.ID, &p.CategoryID, &p.Name, &p.Description, &p.Price,
-		&p.DiscountPercent, &p.WeightGram, &p.AvailabilityType, &p.PoEstimateDays, &p.Status,
-		&p.PrimaryImageURL, &p.TotalStock, &p.VariantCount)
+	err := row.Scan(append(productDest(&p), &p.PrimaryImageURL, &p.TotalStock, &p.VariantCount)...)
 	return p, err
 }
 

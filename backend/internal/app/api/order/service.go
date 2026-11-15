@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"slices"
 	"strings"
 	"time"
@@ -23,7 +22,6 @@ import (
 
 const (
 	numberAttempts = 3
-	maxUniqueCode  = 999
 
 	// expireInterval adalah jeda pemeriksaan order yang lewat batas bayar.
 	expireInterval = 5 * time.Minute
@@ -78,19 +76,13 @@ func (s *Service) Checkout(ctx context.Context, userID string, in CheckoutInput)
 	}
 	ship := shipping{Address: addr, Option: opt, WeightGram: weight}
 
-	n, err := rand.Int(rand.Reader, big.NewInt(maxUniqueCode))
-	if err != nil {
-		return Detail{}, fmt.Errorf("order: unique code: %w", err)
-	}
-	code := int(n.Int64()) + 1
-
 	var o Order
 	for attempt := 1; ; attempt++ {
 		number, err := newOrderNumber()
 		if err != nil {
 			return Detail{}, err
 		}
-		o, err = s.repo.Checkout(ctx, userID, number, code, ship, in)
+		o, err = s.repo.Checkout(ctx, userID, number, ship, in)
 		if errors.Is(err, errDuplicateNumber) && attempt < numberAttempts {
 			continue
 		}

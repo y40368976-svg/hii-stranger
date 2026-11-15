@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hii-stranger1/backend/internal/pkg/database"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -106,7 +107,7 @@ func (r *Repository) UpdateVariant(ctx context.Context, productID, id string, ch
 		set("size", *ch.Size)
 	}
 	if ch.Color != nil {
-		set("color", nullIfEmpty(*ch.Color))
+		set("color", database.NullIfEmpty(*ch.Color))
 	}
 	if ch.Stock != nil {
 		set("stock", *ch.Stock)
@@ -166,14 +167,6 @@ func wrapVariant(op string, err error) error {
 	return fmt.Errorf("product: %s: %w", op, err)
 }
 
-// nullIfEmpty mengubah string kosong menjadi NULL di database.
-func nullIfEmpty(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
 // -------------------------------------------------------------- service
 
 // CreateVariant menambah varian ke produk.
@@ -197,7 +190,7 @@ func (s *Service) DeleteVariant(ctx context.Context, productID, id string) error
 func (h *Handler) CreateVariant(w http.ResponseWriter, r *http.Request) {
 	productID := r.PathValue("productId")
 	if !validator.UUID(productID) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -211,7 +204,7 @@ func (h *Handler) CreateVariant(w http.ResponseWriter, r *http.Request) {
 		Size:      strings.TrimSpace(req.Size),
 	}
 	if req.Color != nil {
-		v.Color = nullIfEmpty(strings.TrimSpace(*req.Color))
+		v.Color = database.NullIfEmpty(strings.TrimSpace(*req.Color))
 	}
 	if req.Stock != nil {
 		v.Stock = *req.Stock
@@ -223,7 +216,7 @@ func (h *Handler) CreateVariant(w http.ResponseWriter, r *http.Request) {
 	c.Check(v.Color == nil || validator.RuneLenBetween(*v.Color, 0, 32), "color", colorMessage)
 	c.Check(v.Stock >= 0, "stock", stockMessage)
 	if errs := c.Errors(); len(errs) > 0 {
-		validationFailed(w, errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -238,7 +231,7 @@ func (h *Handler) CreateVariant(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 	productID, id := r.PathValue("productId"), r.PathValue("variantId")
 	if !validator.UUID(productID) || !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -267,7 +260,7 @@ func (h *Handler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 	c.Check(req.Stock == nil || *req.Stock >= 0, "stock", stockMessage)
 	c.Check(ch != (VariantChanges{}), "body", "Isi minimal satu field yang ingin diubah.")
 	if errs := c.Errors(); len(errs) > 0 {
-		validationFailed(w, errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -282,7 +275,7 @@ func (h *Handler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteVariant(w http.ResponseWriter, r *http.Request) {
 	productID, id := r.PathValue("productId"), r.PathValue("variantId")
 	if !validator.UUID(productID) || !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -300,9 +293,9 @@ func (h *Handler) writeVariantError(w http.ResponseWriter, r *http.Request, op s
 	case err == nil:
 		return false
 	case errors.Is(err, ErrNotFound), errors.Is(err, ErrVariantNotFound):
-		notFound(w)
+		response.NotFound(w)
 	case errors.Is(err, ErrSKUTaken):
-		response.Error(w, http.StatusConflict, "conflict", "SKU sudah dipakai varian lain.")
+		response.Conflict(w, "SKU sudah dipakai varian lain.")
 	case errors.Is(err, ErrVariantInUse):
 		response.Error(w, http.StatusConflict, "conflict",
 			"Varian sudah pernah dipesan sehingga tidak bisa dihapus. Ubah stoknya menjadi 0.")
@@ -311,8 +304,4 @@ func (h *Handler) writeVariantError(w http.ResponseWriter, r *http.Request, op s
 		response.Internal(w)
 	}
 	return true
-}
-
-func validationFailed(w http.ResponseWriter, errs ...response.FieldError) {
-	response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
 }

@@ -64,7 +64,7 @@ func (h *Handler) SubDistricts(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Costs(w http.ResponseWriter, r *http.Request) {
 	p, ok := middleware.PrincipalFrom(r.Context())
 	if !ok {
-		response.Error(w, http.StatusUnauthorized, "unauthorized", "Anda harus login terlebih dahulu.")
+		response.LoginRequired(w)
 		return
 	}
 
@@ -134,7 +134,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, op string, err error) bo
 func pathID(w http.ResponseWriter, r *http.Request, name string) (int, bool) {
 	id, err := strconv.Atoi(r.PathValue(name))
 	if err != nil || id < 1 {
-		response.Error(w, http.StatusNotFound, "not_found", "Data tidak ditemukan.")
+		response.NotFound(w)
 		return 0, false
 	}
 	return id, true

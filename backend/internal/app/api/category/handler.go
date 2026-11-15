@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"hii-stranger1/backend/internal/app/api/middleware"
 	"hii-stranger1/backend/internal/app/api/user"
 	"hii-stranger1/backend/internal/pkg/response"
 	"hii-stranger1/backend/internal/pkg/validator"
@@ -53,8 +52,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		}
 		includeInactive = b
 	}
-	if includeInactive && !isAdmin(r) {
-		forbidden(w)
+	if includeInactive && !user.IsAdminRequest(r) {
+		response.Forbidden(w)
 		return
 	}
 
@@ -77,14 +76,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("categoryId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
-	c, err := h.svc.Get(r.Context(), id, isAdmin(r))
+	c, err := h.svc.Get(r.Context(), id, user.IsAdminRequest(r))
 	switch {
 	case errors.Is(err, ErrNotFound):
-		notFound(w)
+		response.NotFound(w)
 	case err != nil:
 		slog.ErrorContext(r.Context(), "get category failed", "error", err)
 		response.Internal(w)
@@ -103,7 +102,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	req.Name = strings.TrimSpace(req.Name)
 
 	if errs := validateCreate(req); len(errs) > 0 {
-		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
@@ -115,7 +114,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	c, err := h.svc.Create(r.Context(), req.Name, isActive)
 	switch {
 	case errors.Is(err, ErrNameTaken):
-		response.Error(w, http.StatusConflict, "conflict", "Nama kategori sudah ada.")
+		response.Conflict(w, "Nama kategori sudah ada.")
 	case err != nil:
 		slog.ErrorContext(r.Context(), "create category failed", "error", err)
 		response.Internal(w)
@@ -129,7 +128,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("categoryId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
@@ -140,16 +139,16 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	changes, errs := req.changes()
 	if len(errs) > 0 {
-		response.Error(w, http.StatusUnprocessableEntity, "validation_failed", "Data tidak valid.", errs...)
+		response.ValidationFailed(w, errs...)
 		return
 	}
 
 	c, err := h.svc.Update(r.Context(), id, changes)
 	switch {
 	case errors.Is(err, ErrNotFound):
-		notFound(w)
+		response.NotFound(w)
 	case errors.Is(err, ErrNameTaken):
-		response.Error(w, http.StatusConflict, "conflict", "Nama kategori sudah ada.")
+		response.Conflict(w, "Nama kategori sudah ada.")
 	case err != nil:
 		slog.ErrorContext(r.Context(), "update category failed", "error", err)
 		response.Internal(w)
@@ -163,14 +162,14 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("categoryId")
 	if !validator.UUID(id) {
-		notFound(w)
+		response.NotFound(w)
 		return
 	}
 
 	err := h.svc.Delete(r.Context(), id)
 	switch {
 	case errors.Is(err, ErrNotFound):
-		notFound(w)
+		response.NotFound(w)
 	case err != nil:
 		slog.ErrorContext(r.Context(), "delete category failed", "error", err)
 		response.Internal(w)
@@ -199,17 +198,4 @@ func (req updateRequest) changes() (Changes, []response.FieldError) {
 
 	c.Check(out.Name != nil || out.IsActive != nil, "body", "Isi minimal satu field: name atau is_active.")
 	return out, c.Errors()
-}
-
-func isAdmin(r *http.Request) bool {
-	p, ok := middleware.PrincipalFrom(r.Context())
-	return ok && user.IsBackoffice(p.Role)
-}
-
-func notFound(w http.ResponseWriter) {
-	response.Error(w, http.StatusNotFound, "not_found", "Data tidak ditemukan.")
-}
-
-func forbidden(w http.ResponseWriter) {
-	response.Error(w, http.StatusForbidden, "forbidden", "Anda tidak memiliki akses.")
 }

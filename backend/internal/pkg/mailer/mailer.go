@@ -58,13 +58,9 @@ func (m *Mailer) Enabled() bool {
 	return m != nil && m.host != ""
 }
 
-// Notify mengirim email di background supaya response API tidak ikut menunggu
-// server SMTP. Kegagalan hanya dicatat ke log karena email bersifat tambahan.
-func (m *Mailer) Notify(to, subject, body string) {
-	m.notify(to, subject, body, "")
-}
-
-// NotifyEmail mengirim Email (versi teks + HTML) di background, seperti Notify.
+// NotifyEmail mengirim Email (versi teks + HTML) di background supaya response
+// API tidak ikut menunggu server SMTP. Kegagalan hanya dicatat ke log karena
+// email bersifat tambahan.
 func (m *Mailer) NotifyEmail(to, subject string, e Email) {
 	text, html := e.Render()
 	m.notify(to, subject, text, html)
@@ -91,20 +87,8 @@ func (m *Mailer) notify(to, subject, text, html string) {
 	}()
 }
 
-// NotifyOwner sama dengan Notify, dengan penerima email pemilik toko.
-func (m *Mailer) NotifyOwner(subject, body string) {
-	if m == nil {
-		return
-	}
-	m.Notify(m.owner, subject, body)
-}
-
-// Send mengirim satu email teks biasa dan menunggu sampai selesai. Port 465
-// memakai TLS langsung; port lain (mis. 587) memakai STARTTLS.
-func (m *Mailer) Send(ctx context.Context, to, subject, body string) error {
-	return m.send(ctx, to, subject, body, "")
-}
-
+// send mengirim satu email dan menunggu sampai selesai. Port 465 memakai TLS
+// langsung; port lain (mis. 587) memakai STARTTLS.
 func (m *Mailer) send(ctx context.Context, to, subject, body, htmlBody string) error {
 	if !m.Enabled() {
 		return nil

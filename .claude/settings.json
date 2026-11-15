@@ -1,5 +1,5 @@
 {
-  "model": "opus",
+  "model": "sonnet",
   "effortLevel": "medium",
   "permissions": {
     "deny": [
@@ -10,5 +10,6 @@
       "Read(./backend/.env)",
       "Read(./frontend/.env.local)"
     ]
-  }
+  },
+  "agent": "dev"
 }

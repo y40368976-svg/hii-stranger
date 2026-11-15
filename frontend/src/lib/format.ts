@@ -50,9 +50,9 @@ export const ORDER_STATUS_TONE: Record<string, Tone> = {
 };
 
 export const PAYMENT_STATUS_LABEL: Record<string, string> = {
-  pending: "Menunggu",
-  approved: "Disetujui",
-  rejected: "Ditolak",
+  menunggu: "Menunggu",
+  valid: "Disetujui",
+  ditolak: "Ditolak",
 };
 
 export const SHIPPING_STATUS_LABEL: Record<string, string> = {
