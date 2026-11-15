@@ -162,21 +162,6 @@ func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, s
 		}
 	}
 
-	// Tagihan QRIS langsung dibuat: nominal = total + kode unik 3 digit
-	// supaya admin bisa mencocokkan mutasi QRIS dengan order.
-	// Kode unik dipilih acak di antara yang nominalnya belum dipakai pesanan pending lain.
-	tag, err := tx.Exec(ctx,
-		`INSERT INTO payments (order_id, method, amount, unique_code, status)
-		 SELECT $1::uuid, 'qris', $2::numeric + c, c, 'menunggu'
-		   FROM generate_series(1, 999) c
-		  WHERE NOT EXISTS (SELECT 1 FROM payments p JOIN orders po ON po.id = p.order_id
-		                     WHERE po.order_status = 'pending_payment' AND p.amount = $2::numeric + c)
-		  ORDER BY random() LIMIT 1`,
-		o.ID, o.TotalAmount)
-	if err != nil || tag.RowsAffected() == 0 {
-		return Order{}, wrap("checkout insert payment", errors.Join(err, errors.New("tidak ada kode unik bebas")))
-	}
-
 	for variantID, qty := range need {
 		if _, err := tx.Exec(ctx,
 			`UPDATE product_variants SET stock = stock - $2 WHERE id = $1`, variantID, qty); err != nil {

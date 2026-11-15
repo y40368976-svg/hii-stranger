@@ -767,8 +767,8 @@ export interface paths {
         put?: never;
         /**
          * Buat pembayaran untuk order
-         * @description Hak akses: customer pemilik order. Hanya untuk order lama yang belum punya tagihan, karena checkout
-         *     sudah membuat tagihan QRIS otomatis. Server menentukan `amount` (total order ditambah `unique_code`),
+         * @description Hak akses: customer pemilik order. Dipanggil saat pelanggan membuka informasi pembayaran; checkout
+         *     tidak membuat tagihan. Server menentukan `amount` (total order ditambah `unique_code`),
          *     `unique_code`, dan `status` awal. Order yang sudah punya pembayaran dijawab 409.
          */
         post: operations["createOrderPayment"];
