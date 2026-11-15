@@ -51,7 +51,12 @@ func (s *Service) Create(ctx context.Context, orderID, userID, method string) (P
 	if err != nil {
 		return Payment{}, fmt.Errorf("payment: unique code: %w", err)
 	}
-	return s.repo.Create(ctx, orderID, userID, method, int(n.Int64())+1)
+	p, err := s.repo.Create(ctx, orderID, userID, method, int(n.Int64())+1)
+	if errors.Is(err, ErrAlreadyExists) {
+		// Tagihan sudah dibuat saat checkout; membuka info pembayaran mengembalikannya (SDD D-06).
+		return s.repo.GetByOrder(ctx, orderID)
+	}
+	return p, err
 }
 
 // UploadProof menyimpan bukti pembayaran milik order userID, lalu memberi

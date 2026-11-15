@@ -35,6 +35,13 @@ func (s *Service) Get(ctx context.Context, orderID, userID string, admin bool) (
 // Upsert membuat atau memperbarui pengiriman (admin), lalu mengirim info
 // kurir dan resi ke email pelanggan.
 func (s *Service) Upsert(ctx context.Context, in Shipment) (Shipment, bool, error) {
+	ok, err := s.repo.Shippable(ctx, in.OrderID)
+	if err != nil {
+		return Shipment{}, false, err
+	}
+	if !ok {
+		return Shipment{}, false, ErrOrderNotShippable
+	}
 	out, created, err := s.repo.Upsert(ctx, in)
 	if err != nil {
 		return Shipment{}, false, err

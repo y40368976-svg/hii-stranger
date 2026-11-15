@@ -72,7 +72,7 @@ type cartLine struct {
 // menghapus item keranjang dalam satu transaksi. Hanya pelanggan aktif yang
 // emailnya sudah terverifikasi yang boleh checkout (dicek di sini supaya
 // tidak bergantung pada isi token).
-func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, uniqueCode int, ship shipping, in CheckoutInput) (Order, error) {
+func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, ship shipping, in CheckoutInput) (Order, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return Order{}, wrap("checkout begin", err)
@@ -164,11 +164,17 @@ func (r *Repository) Checkout(ctx context.Context, userID, orderNumber string, u
 
 	// Tagihan QRIS langsung dibuat: nominal = total + kode unik 3 digit
 	// supaya admin bisa mencocokkan mutasi QRIS dengan order.
-	if _, err := tx.Exec(ctx,
+	// Kode unik dipilih acak di antara yang nominalnya belum dipakai pesanan pending lain.
+	tag, err := tx.Exec(ctx,
 		`INSERT INTO payments (order_id, method, amount, unique_code, status)
-		 VALUES ($1, 'qris', $2::numeric + $3::int, $3::int, 'pending')`,
-		o.ID, o.TotalAmount, uniqueCode); err != nil {
-		return Order{}, wrap("checkout insert payment", err)
+		 SELECT $1::uuid, 'qris', $2::numeric + c, c, 'menunggu'
+		   FROM generate_series(1, 999) c
+		  WHERE NOT EXISTS (SELECT 1 FROM payments p JOIN orders po ON po.id = p.order_id
+		                     WHERE po.order_status = 'pending_payment' AND p.amount = $2::numeric + c)
+		  ORDER BY random() LIMIT 1`,
+		o.ID, o.TotalAmount)
+	if err != nil || tag.RowsAffected() == 0 {
+		return Order{}, wrap("checkout insert payment", errors.Join(err, errors.New("tidak ada kode unik bebas")))
 	}
 
 	for variantID, qty := range need {
@@ -460,7 +466,7 @@ func noProofUnderReview(ctx context.Context, tx pgx.Tx, id string) error {
 	var reviewing bool
 	err := tx.QueryRow(ctx,
 		`SELECT EXISTS (SELECT 1 FROM payments
-		                 WHERE order_id = $1 AND status = 'pending' AND proof_url IS NOT NULL)`, id).Scan(&reviewing)
+		                 WHERE order_id = $1 AND status = 'menunggu' AND proof_url IS NOT NULL)`, id).Scan(&reviewing)
 	if err != nil {
 		return wrap("check proof", err)
 	}
@@ -505,7 +511,7 @@ func (r *Repository) Summary(ctx context.Context) (Summary, error) {
 	b := &pgx.Batch{}
 	b.Queue(`SELECT order_status, COUNT(*) FROM orders GROUP BY order_status`)
 	b.Queue(`SELECT COUNT(*) FROM payments p JOIN orders o ON o.id = p.order_id
-	          WHERE p.status = 'pending' AND p.proof_url IS NOT NULL AND o.order_status = 'pending_payment'`)
+	          WHERE p.status = 'menunggu' AND p.proof_url IS NOT NULL AND o.order_status = 'pending_payment'`)
 	b.Queue(`SELECT COUNT(*) FROM orders WHERE created_at >= date_trunc('day', now())`)
 	b.Queue(`SELECT COALESCE(SUM(total_amount), 0)::text, COUNT(*) FROM orders
 	          WHERE order_status IN ('paid', 'processing', 'shipped', 'completed')

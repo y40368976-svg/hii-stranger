@@ -226,7 +226,7 @@ func (r *Repository) List(ctx context.Context, f Filter, limit, offset int) ([]A
 		   FROM payments p
 		   JOIN orders o ON o.id = p.order_id
 		   JOIN users u ON u.id = o.user_id%s
-		 ORDER BY (p.status = 'pending' AND p.proof_url IS NOT NULL) DESC,
+		 ORDER BY (p.status = 'menunggu' AND p.proof_url IS NOT NULL) DESC,
 		          p.paid_at DESC NULLS LAST, p.created_at DESC, p.id
 		 LIMIT $%d OFFSET $%d`, paymentColumns, where, len(args)-1, len(args)),
 		args...)
