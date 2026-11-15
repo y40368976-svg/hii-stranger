@@ -3,7 +3,7 @@ on:
   push: { branches: [main] }
   pull_request:
   schedule: [{ cron: "0 2 * * 1" }] # Senin: dependency baru bisa kena CVE tanpa ada commit
-permissions: { contents: read }
+permissions: { contents: read, pull-requests: read } # pull-requests: dibutuhkan gitleaks-action
 
 jobs:
   backend:
