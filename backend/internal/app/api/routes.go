@@ -308,6 +308,7 @@ func newRouter(cfg config.Config, tokens *token.Manager, h handlers, rdb *redis.
 		// Header keamanan dipasang paling awal supaya ikut di respons error,
 		// preflight CORS, dan 503 maintenance.
 		middleware.SecurityHeaders(cfg.TrustProxyHeaders),
+		middleware.Gzip(),
 		// Batas request bersamaan (MAX_CONCURRENT_REQUESTS); penuh = 503.
 		middleware.MaxConcurrent(cfg.MaxConcurrentRequests, healthPaths...),
 		middleware.Logger(),
