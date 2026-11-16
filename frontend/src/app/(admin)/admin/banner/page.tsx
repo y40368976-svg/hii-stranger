@@ -3,16 +3,30 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Image as ImageIcon, Trash2, Upload } from "lucide-react";
-import { Card, PageHead, Toggle, btnDanger, btnLime, btnLine, inputCls, labelCls } from "@/components/admin/ui";
+import {
+  Card,
+  PageHead,
+  Toggle,
+  btnDanger,
+  btnLime,
+  btnLine,
+  inputCls,
+  labelCls,
+} from "@/components/admin/ui";
 import { errorMessage } from "@/lib/api";
 import { cdn } from "@/lib/img";
 import { adminService } from "@/services";
 import type { ApiBanner, BannerInput, BannerPlacement } from "@/types/api";
 
-const PLACEMENT: Record<BannerPlacement, string> = { hero: "Beranda (hero)", main: "Beranda (utama)", catalog: "Katalog" };
+const PLACEMENT: Record<BannerPlacement, string> = {
+  hero: "Beranda (hero)",
+  main: "Beranda (utama)",
+  catalog: "Katalog",
+};
 
 function checkFile(file: File) {
-  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return "Format gambar harus JPG, PNG, atau WebP.";
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type))
+    return "Format gambar harus JPG, PNG, atau WebP.";
   if (file.size > 5 * 1024 * 1024) return "Ukuran gambar maksimal 5 MB.";
   return "";
 }
@@ -81,7 +95,8 @@ export default function BannerPage() {
     const bad = checkFile(file);
     if (bad) return toast.error(bad);
     const l = link.trim();
-    if (l && !l.startsWith("/") && !/^https?:\/\//.test(l)) return toast.error("Tautan harus diawali / atau http(s)://");
+    if (l && !l.startsWith("/") && !/^https?:\/\//.test(l))
+      return toast.error("Tautan harus diawali / atau http(s)://");
     setBusy(true);
     try {
       const { url } = await adminService.uploadImage(file);
@@ -114,33 +129,64 @@ export default function BannerPage() {
         title="Kelola Banner"
         sub="Banner tampil di Beranda sesuai urutan."
         action={
-          <button onClick={() => formRef.current?.querySelector("input")?.focus()} className={btnLime + " px-5 py-3"}>
+          <button
+            onClick={() => formRef.current?.querySelector("input")?.focus()}
+            className={btnLime + " px-5 py-3"}
+          >
             + Tambah Banner
           </button>
         }
       />
       <div className="grid gap-6 sm:grid-cols-[1fr_220px] xl:grid-cols-[1fr_400px]">
         <div className="min-w-0 space-y-6">
-          {list.length === 0 && <Card><p className="text-sm text-muted">Belum ada banner.</p></Card>}
+          {list.length === 0 && (
+            <Card>
+              <p className="text-sm text-muted">Belum ada banner.</p>
+            </Card>
+          )}
           {list.map((b) => (
             <Card key={b.id} className="flex gap-4 xl:gap-5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={cdn(b.image_url, 600)} alt={b.title ?? "Banner"} className="aspect-[244/140] w-32 self-start rounded-xl bg-[#d9d9d9] object-cover sm:w-36 xl:w-60" />
+              <img
+                src={cdn(b.image_url, 600)}
+                alt={b.title ?? "Banner"}
+                className="aspect-244/140 w-32 self-start rounded-xl bg-[#d9d9d9] object-cover sm:w-36 xl:w-60"
+              />
               <div className="flex flex-1 flex-col">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-sm">
-                    <b className="text-base">{b.title || PLACEMENT[b.placement]}</b>
+                    <b className="text-base">
+                      {b.title || PLACEMENT[b.placement]}
+                    </b>
                     <p>{b.link_url || "Tanpa tautan"}</p>
-                    <p>Urutan {b.sort_order} · {PLACEMENT[b.placement]}</p>
+                    <p>
+                      Urutan {b.sort_order} · {PLACEMENT[b.placement]}
+                    </p>
                   </div>
-                  <Toggle checked={b.is_active} onChange={(v) => patch(b, { is_active: v })} label={"Aktifkan banner urutan " + b.sort_order} />
+                  <Toggle
+                    checked={b.is_active}
+                    onChange={(v) => patch(b, { is_active: v })}
+                    label={"Aktifkan banner urutan " + b.sort_order}
+                  />
                 </div>
                 <div className="mt-auto flex flex-wrap justify-end gap-2 pt-4">
-                  <label className={btnLine + " flex cursor-pointer items-center gap-2"}>
+                  <label
+                    className={
+                      btnLine + " flex cursor-pointer items-center gap-2"
+                    }
+                  >
                     <ImageIcon className="size-4" aria-hidden /> Ganti gambar
-                    <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => replaceImage(b, e.target.files?.[0])} />
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      onChange={(e) => replaceImage(b, e.target.files?.[0])}
+                    />
                   </label>
-                  <button onClick={() => remove(b)} className={btnDanger + " flex items-center gap-2"}>
+                  <button
+                    onClick={() => remove(b)}
+                    className={btnDanger + " flex items-center gap-2"}
+                  >
                     <Trash2 className="size-4" aria-hidden /> Hapus
                   </button>
                 </div>
@@ -154,21 +200,42 @@ export default function BannerPage() {
             <label className="grid min-h-32 cursor-pointer place-items-center overflow-hidden rounded-lg border border-dashed border-ink-3 bg-[#e9e9e9] text-center">
               {preview ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={preview} alt="Pratinjau banner" className="max-h-48 w-full object-cover" />
+                <img
+                  src={preview}
+                  alt="Pratinjau banner"
+                  className="max-h-48 w-full object-cover"
+                />
               ) : (
                 <span className="py-6 text-sm font-semibold">
-                  <Upload className="mx-auto mb-2 size-7 text-muted" aria-hidden />
+                  <Upload
+                    className="mx-auto mb-2 size-7 text-muted"
+                    aria-hidden
+                  />
                   Pilih gambar
-                  <span className="block text-[10px] font-normal text-muted">JPG atau PNG</span>
+                  <span className="block text-[10px] font-normal text-muted">
+                    JPG atau PNG
+                  </span>
                 </span>
               )}
-              <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+              />
             </label>
             <div>
               <label htmlFor="placement" className={labelCls}>
                 Posisi
               </label>
-              <select id="placement" value={placement} onChange={(e) => setPlacement(e.target.value as BannerPlacement)} className={inputCls}>
+              <select
+                id="placement"
+                value={placement}
+                onChange={(e) =>
+                  setPlacement(e.target.value as BannerPlacement)
+                }
+                className={inputCls}
+              >
                 {Object.entries(PLACEMENT).map(([v, l]) => (
                   <option key={v} value={v}>
                     {l}
@@ -180,11 +247,21 @@ export default function BannerPage() {
               <label htmlFor="link" className={labelCls}>
                 Tautan tujuan
               </label>
-              <input id="link" value={link} onChange={(e) => setLink(e.target.value)} placeholder="/katalog" className={inputCls} />
+              <input
+                id="link"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                placeholder="/katalog"
+                className={inputCls}
+              />
               <p className="mt-2 text-[10px] text-muted">Boleh dikosongkan.</p>
             </div>
             <div className="flex justify-end gap-6">
-              <button type="button" onClick={reset} className="font-semibold underline">
+              <button
+                type="button"
+                onClick={reset}
+                className="font-semibold underline"
+              >
                 Batal
               </button>
               <button disabled={busy} className={btnLime + " px-5 py-3"}>

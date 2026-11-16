@@ -23,7 +23,7 @@ export default function Field({ label, error, icon, type, className, ...rest }: 
           type={pw && show ? "text" : type}
           aria-invalid={!!error}
           className={cn(
-            "h-[60px] w-full rounded-xl border bg-white px-6 focus:outline-2 focus:outline-ink",
+            "h-15 w-full rounded-xl border bg-white px-6 focus:outline-2 focus:outline-ink",
             Icon && "pl-12",
             pw && "pr-12",
             error ? "border-danger bg-[#fff8f7]" : "border-faint",

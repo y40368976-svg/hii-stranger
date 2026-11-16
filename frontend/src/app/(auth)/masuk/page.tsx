@@ -66,7 +66,7 @@ export default function MasukPage() {
             Lupa kata sandi?
           </Link>
         </p>
-        <button disabled={busy} className="mt-2 h-[60px] w-full rounded-xl bg-lime font-bold text-ink disabled:opacity-60">
+        <button disabled={busy} className="mt-2 height: 60p w-full rounded-xl bg-lime font-bold text-ink disabled:opacity-60">
           {busy ? "Memproses..." : "Masuk"}
         </button>
       </form>

@@ -9,7 +9,7 @@ import AuthShell from "@/components/auth/AuthShell";
 import { errorMessage } from "@/lib/api";
 import { authService } from "@/services";
 
-const btn = "flex h-[60px] w-full items-center justify-center rounded-xl font-bold disabled:opacity-60";
+const btn = "flex h-15 w-full items-center justify-center rounded-xl font-bold disabled:opacity-60";
 
 export default function VerifikasiEmailPage() {
   const { user, loading, logout, setUser } = useAuth();

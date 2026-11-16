@@ -40,7 +40,7 @@ function Katalog() {
   const total = cats.reduce((n, c) => n + c.count, 0);
   const chip = (on: boolean) =>
     cn("rounded-full border px-6 py-4 text-lg font-bold", on ? "border-ink bg-ink text-white" : "border-line bg-white");
-  const box = "grid size-[60px] place-items-center rounded-xl border text-2xl font-bold disabled:opacity-40";
+  const box = "grid size-15 place-items-center rounded-xl border text-2xl font-bold disabled:opacity-40";
 
   return (
     <div>
@@ -81,7 +81,7 @@ function Katalog() {
         ))}
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-[22px]">
+      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5.5">
         {items.map((p) => (
           <ProductCard key={p.id} p={p} category={cats.find((c) => c.id === p.category_id)?.name} />
         ))}

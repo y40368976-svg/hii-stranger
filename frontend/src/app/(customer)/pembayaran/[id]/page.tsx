@@ -84,7 +84,7 @@ export default function PembayaranPage() {
             <div className="mt-6 rounded-2xl border-2 border-ink px-3 py-6 text-center lg:px-6 lg:py-10">
               {st?.qris_image_url && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={st.qris_image_url} alt="Kode QRIS" className="mx-auto size-40 sm:size-[200px] lg:size-[220px] object-contain" />
+                <img src={st.qris_image_url} alt="Kode QRIS" className="mx-auto size-40 sm:size-50 lg:size-55 object-contain" />
               )}
               <p className="mt-8 text-muted">Pindai dengan aplikasi pembayaran yang mendukung QRIS</p>
               <p className="mt-8 text-muted">Nominal yang harus dibayar</p>
@@ -126,7 +126,7 @@ export default function PembayaranPage() {
               onClick={() => pick.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => (e.preventDefault(), choose(e.dataTransfer.files[0]))}
-              className="mt-5 grid h-[185px] w-full place-items-center rounded-2xl border-2 border-dashed border-muted text-muted"
+              className="mt-5 grid h-46.25 w-full place-items-center rounded-2xl border-2 border-dashed border-muted text-muted"
             >
               <span>
                 <b className="text-ink">Pilih berkas</b> atau tarik ke sini
@@ -138,7 +138,7 @@ export default function PembayaranPage() {
             {file && (
               <div className="mt-4 flex items-center gap-4">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={preview} alt="" className="size-[50px] rounded-lg bg-[#d9d9d9] object-cover" />
+                <img src={preview} alt="" className="size-12.5 rounded-lg bg-[#d9d9d9] object-cover" />
                 <span className="flex-1 truncate text-xs font-semibold">{file.name}</span>
                 <button aria-label="Hapus berkas" onClick={() => setFile(null)}>
                   <X className="size-4" />
@@ -146,7 +146,7 @@ export default function PembayaranPage() {
               </div>
             )}
             {err && pay && <p role="alert" className="mt-3 text-xs text-danger">{err}</p>}
-            <button onClick={send} disabled={!file || busy} className="mt-4 h-[34px] w-full rounded-lg bg-lime text-xs font-bold disabled:opacity-50">
+            <button onClick={send} disabled={!file || busy} className="mt-4 h-8.5 w-full rounded-lg bg-lime text-xs font-bold disabled:opacity-50">
               {busy ? "Mengirim..." : "Kirim Bukti Pembayaran"}
             </button>
           </section>

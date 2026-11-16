@@ -39,7 +39,7 @@ export default function ProdukPage() {
   const variant = p?.variants.find((v) => v.size === activeSize && (v.color ?? "") === activeColor);
 
   if (missing) return <p className="py-20 text-center text-lg text-muted">Produk tidak ditemukan.</p>;
-  if (!p) return <div className="h-[650px] animate-pulse rounded-2xl bg-[#d9d9d9]" />;
+  if (!p) return <div className="h-162.5 animate-pulse rounded-2xl bg-[#d9d9d9]" />;
 
   const catName = cats.find((c) => c.id === p.category_id)?.name;
   const images = [...p.images].sort((a, b) => a.sort_order - b.sort_order);
@@ -65,7 +65,7 @@ export default function ProdukPage() {
         <span className="text-ink">{p.name}</span>
       </p>
 
-      <div className="mt-4 grid gap-6 sm:grid-cols-2 sm:gap-7 lg:gap-[60px]">
+      <div className="mt-4 grid gap-6 sm:grid-cols-2 sm:gap-7 lg:gap-15">
         <div>
           <div className="aspect-square overflow-hidden rounded-2xl bg-[#d9d9d9]">
             {images[img] && (

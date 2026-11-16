@@ -103,7 +103,7 @@ export default function PesananDetailPage() {
             <ul className="mt-4 space-y-4">
               {o.items.map((i) => (
                 <li key={i.id} className="flex items-center gap-4">
-                  <div className="size-[50px] shrink-0 overflow-hidden rounded-lg bg-[#d9d9d9]">
+                  <div className="size-12.5 shrink-0 overflow-hidden rounded-lg bg-[#d9d9d9]">
                     {i.image_url && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={cdn(i.image_url, 100)} alt="" className="size-full object-cover" />

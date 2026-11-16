@@ -23,7 +23,7 @@ export default function Home() {
   return (
     <div className="space-y-6 lg:space-y-10">
       {banner === null ? (
-        <div className="flex h-[354px] flex-col items-start justify-end gap-4 rounded-2xl bg-ink p-8 text-white sm:h-[290px] lg:p-12">
+        <div className="flex h-88.5 flex-col items-start justify-end gap-4 rounded-2xl bg-ink p-8 text-white sm:h-72.5 lg:p-12">
           <Image src="/Logo.png" alt="" width={68} height={60} className="h-14 w-auto" />
           <h1 className="max-w-xl text-3xl font-extrabold lg:text-5xl">Streetwear lokal, siap dipakai.</h1>
           <p className="font-bold text-lime">cz we are not really strangers</p>
@@ -32,7 +32,7 @@ export default function Home() {
           </Link>
         </div>
       ) : (
-        <div className="h-[354px] overflow-hidden rounded-2xl bg-[#d9d9d9] sm:h-[290px]">
+        <div className="h-88.5 overflow-hidden rounded-2xl bg-[#d9d9d9] sm:h-72.5">
           {banner && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={cdn(banner.image_url, 1400)} alt={banner.title ?? "Banner"} className="size-full object-cover" />

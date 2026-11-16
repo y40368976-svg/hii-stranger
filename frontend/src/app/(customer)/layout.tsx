@@ -9,7 +9,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
       <MaintenanceGuard />
       <VerifyGuard />
       <Navbar />
-      <main className="mx-auto w-full max-w-[1440px] flex-1 px-6 py-6 sm:px-9 sm:py-8 lg:px-14 lg:py-12">{children}</main>
+      <main className="mx-auto w-full max-w-360 flex-1 px-6 py-6 sm:px-9 sm:py-8 lg:px-14 lg:py-12">{children}</main>
       <Footer />
     </div>
   );

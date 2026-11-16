@@ -43,7 +43,7 @@ export default function Navbar() {
 
   return (
     <header className="relative z-30 bg-ink text-white">
-      <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-2 px-4 sm:px-6 lg:gap-4 lg:px-14">
+      <div className="mx-auto flex h-16 max-w-360 items-center gap-2 px-4 sm:px-6 lg:gap-4 lg:px-14">
         <button type="button" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu(!menu)} className={cn(icon, "-ml-2 lg:hidden")}>
           {menu ? <X className="size-5" /> : <Menu className="size-5" />}
         </button>
