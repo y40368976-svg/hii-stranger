@@ -25,8 +25,7 @@ ke pihak lain, berlaku ketentuan Pasal 4.
 
 ## 4. Transfer / Serah Terima
 Pengalihan kode sumber dan hak pengembangan kepada pihak lain hanya sah bila:
-(a) disepakati tertulis oleh Pengembang; dan
-(b) [mis. seluruh biaya yang disepakati telah dilunasi].
+(a) disepakati tertulis oleh Pengembang
 Sebelum syarat ini terpenuhi, hak pengembangan tetap eksklusif pada Pengembang.
 
 ## 5. Atribusi
