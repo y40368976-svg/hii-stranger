@@ -1,13 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./css/style.css";
 import { Suspense } from "react";
 import Providers from "./providers";
 import { RouteProgress } from "@/components/ui/Loader";
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
+// Inter variable (frontend/font); satu berkas mencakup bobot 100-900
+const inter = localFont({
+  src: "../../font/Inter-VariableFont_opsz,wght.ttf",
+  weight: "100 900",
   variable: "--font-inter",
   display: "swap",
 });
