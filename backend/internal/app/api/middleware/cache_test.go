@@ -161,3 +161,17 @@ func TestResponseCacheRedisDown(t *testing.T) {
 		t.Fatalf("redis mati: request tulis tidak boleh gagal, dapat %d", rec.Code)
 	}
 }
+
+func TestResponseCacheSkipsNonJSON(t *testing.T) {
+	var calls int
+	c := newTestCache(t)
+	h := Chain(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte("<b>x</b>"))
+	}), c.Cached())
+	get(h, "/page", "")
+	if r := get(h, "/page", ""); r.Header().Get("X-Cache") == "HIT" || calls != 2 {
+		t.Fatalf("respons non-JSON tidak boleh di-cache, calls=%d", calls)
+	}
+}

@@ -92,10 +92,12 @@ func (c *ResponseCache) Cached() Middleware {
 			w.Header().Set("X-Cache", "MISS")
 			rec := &bodyRecorder{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(rec, r)
-			if rec.status != http.StatusOK || rec.tooBig {
+			ct := w.Header().Get("Content-Type")
+			// hanya JSON yang di-cache, supaya body non-JSON (mis. HTML) tidak diputar ulang dari Redis
+			if rec.status != http.StatusOK || rec.tooBig || !strings.HasPrefix(ct, "application/json") {
 				return
 			}
-			entry := encodeEntry(w.Header().Get("Content-Type"), rec.buf.Bytes())
+			entry := encodeEntry(ct, rec.buf.Bytes())
 			if err := c.rdb.Set(ctx, key, entry, c.ttl).Err(); err != nil {
 				logCacheErr(ctx, "store entry", err)
 			}
