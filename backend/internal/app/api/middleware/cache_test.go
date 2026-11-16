@@ -175,3 +175,20 @@ func TestResponseCacheSkipsNonJSON(t *testing.T) {
 		t.Fatalf("respons non-JSON tidak boleh di-cache, calls=%d", calls)
 	}
 }
+
+func TestBodyRecorderDefaultsToJSON(t *testing.T) {
+	for _, tc := range []struct{ set, want string }{
+		{"", "application/json; charset=utf-8"},
+		{"text/plain", "text/plain"},
+	} {
+		rec := httptest.NewRecorder()
+		if tc.set != "" {
+			rec.Header().Set("Content-Type", tc.set)
+		}
+		b := &bodyRecorder{ResponseWriter: rec}
+		_, _ = b.Write([]byte("{}"))
+		if got := rec.Header().Get("Content-Type"); got != tc.want {
+			t.Fatalf("Content-Type = %q, want %q", got, tc.want)
+		}
+	}
+}
