@@ -4,15 +4,15 @@ Satu fitur (misal produk) = satu folder di `internal/app/api/`. Isinya 4 file ke
 
 ## 1. Bayangkan seperti restoran
 
-**routes.go — papan nama pintu**Menentukan alamat URL mana dilayani siapa. Contoh: `GET /products ` dilayani `List `.
+**routes.go — papan nama pintu** Menentukan alamat URL mana dilayani siapa. Contoh: `GET /products` dilayani `List`.
 
-**handler.go — pelayan**Menerima pesanan dari pengguna, mengecek isinya benar atau tidak, lalu mengirim jawaban.
+**handler.go — pelayan** Menerima pesanan dari pengguna, mengecek isinya benar atau tidak, lalu mengirim jawaban.
 
-**service.go — manajer**Memegang aturan. Contoh: "pembeli biasa hanya boleh lihat produk yang aktif".
+**service.go — manajer** Memegang aturan. Contoh: "pembeli biasa hanya boleh lihat produk yang aktif".
 
-**repository.go — juru gudang**Satu-satunya yang bicara ke database (ambil, simpan, ubah, hapus).
+**repository.go — juru gudang** Satu-satunya yang bicara ke database (ambil, simpan, ubah, hapus).
 
-**model.go — daftar menu**Bentuk datanya: produk punya nama, harga, dan seterusnya.
+**model.go — daftar menu** Bentuk datanya: produk punya nama, harga, dan seterusnya.
 
 **Perjalanan satu permintaan:**
 
@@ -24,14 +24,14 @@ Jawabannya kembali lewat jalan yang sama.
 
 Jangan mulai dari kosong. Buka folder `category/` atau `product/` yang sudah jadi, lalu tiru polanya.
 
-1.  **Lihat contekannya**Buka `api/openapi.yaml ` (isi permintaan dan jawaban yang diminta) dan file di folder `migrations/` (nama kolom tabel).
-2.  **model.go**Tulis bentuk datanya, sesuai kolom tabel.
-3.  **repository.go**Tulis perintah database: ambil daftar, ambil satu, buat, ubah, hapus.
-4.  **service.go**Panggil repository. Kalau ada aturan, tambahkan di sini. Kalau tidak ada, cukup teruskan saja.
-5.  **handler.go**Baca permintaan, cek isinya, panggil service, kirim jawaban.
-6.  **server.go**Sambungkan: repository → service → handler (lihat bagian `category ` di file itu, tinggal tiru).
-7.  **routes.go**Daftarkan URL-nya (tiru bagian `categories `).
-8.  **Tes**Jalankan perintah di bagian 4, lalu coba lewat Postman.
+1.  **Lihat contekannya** Buka `api/openapi.yaml` (isi permintaan dan jawaban yang diminta) dan file di folder `migrations/` (nama kolom tabel).
+2.  **model.go** Tulis bentuk datanya, sesuai kolom tabel.
+3.  **repository.go** Tulis perintah database: ambil daftar, ambil satu, buat, ubah, hapus.
+4.  **service.go** Panggil repository. Kalau ada aturan, tambahkan di sini. Kalau tidak ada, cukup teruskan saja.
+5.  **handler.go** Baca permintaan, cek isinya, panggil service, kirim jawaban.
+6.  **server.go** Sambungkan: repository → service → handler (lihat bagian `category` di file itu, tinggal tiru).
+7.  **routes.go** Daftarkan URL-nya (tiru bagian `categories`).
+8.  **Tes** Jalankan perintah di bagian 4, lalu coba lewat Postman.
 
 Kenapa urutannya begini? Yang paling bawah (data) ditulis dulu, yang paling atas (URL) terakhir. Jadi setiap langkah bisa dicek sebelum lanjut.
 
@@ -47,7 +47,7 @@ Kenapa urutannya begini? Yang paling bawah (data) ditulis dulu, yang paling atas
 
 ## 4. Cek sebelum bilang selesai
 
-Buka terminal di folder `backend `, ganti `nama ` dengan nama folder fiturmu:
+Buka terminal di folder `backend`, ganti `nama` dengan nama folder fiturmu:
 
 ```
 gofmt -l internal/app/api/nama      # kalau ada nama file keluar, berarti belum rapi
@@ -72,7 +72,7 @@ Kalau ketiganya tidak menampilkan error, coba endpoint-nya lewat Postman.
 ## 6. Tiga aturan penting
 
 -   Jangan bikin file atau fungsi yang belum dibutuhkan. Mulai dari yang paling sederhana.
--   Jangan kirim pesan error database ke pengguna. Cukup catat dengan `slog `.
+-   Jangan kirim pesan error database ke pengguna. Cukup catat dengan `slog`.
 -   Jangan bilang selesai sebelum langkah 4 lolos dan endpoint sudah dicoba.
 
 ## 7. Progres fitur
