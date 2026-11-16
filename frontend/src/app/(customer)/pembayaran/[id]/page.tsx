@@ -138,7 +138,7 @@ export default function PembayaranPage() {
             {file && (
               <div className="mt-4 flex items-center gap-4">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={preview} alt="" className="size-12.5 rounded-lg bg-[#d9d9d9] object-cover" />
+                <img src={preview.startsWith("blob:") ? preview : undefined} alt="" className="size-12.5 rounded-lg bg-[#d9d9d9] object-cover" />
                 <span className="flex-1 truncate text-xs font-semibold">{file.name}</span>
                 <button aria-label="Hapus berkas" onClick={() => setFile(null)}>
                   <X className="size-4" />
