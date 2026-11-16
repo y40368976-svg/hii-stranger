@@ -201,6 +201,10 @@ func (b *bodyRecorder) WriteHeader(code int) {
 }
 
 func (b *bodyRecorder) Write(p []byte) (int, error) {
+	// middleware ini hanya dipasang pada endpoint JSON: default ke JSON, bukan sniffing
+	if b.ResponseWriter.Header().Get("Content-Type") == "" {
+		b.ResponseWriter.Header().Set("Content-Type", "application/json; charset=utf-8")
+	}
 	if !b.tooBig {
 		if b.buf.Len()+len(p) > maxCachedBody {
 			b.tooBig = true
