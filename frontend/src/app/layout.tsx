@@ -27,7 +27,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className={`${inter.variable}`} suppressHydrationWarning>
+    <html lang="id" data-scroll-behavior="smooth" className={`${inter.variable}`} suppressHydrationWarning>
       <body>
         <Suspense fallback={null}>
           <RouteProgress />

@@ -36,7 +36,7 @@ export default function Field({ label, error, icon, type, className, ...rest }: 
             type="button"
             onClick={() => setShow((s) => !s)}
             aria-label={show ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-faint"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-muted"
           >
             {show ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
           </button>

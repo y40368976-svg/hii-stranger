@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
+import { Breadcrumb } from "@/components/ui/misc";
 import { useCategories } from "@/hooks/useCategories";
 import { cn } from "@/lib/cn";
 import { productService } from "@/services";
@@ -44,9 +45,7 @@ function Katalog() {
 
   return (
     <div>
-      <p className="text-lg text-muted">
-        Beranda <span className="mx-1 text-sm">&gt;</span> <span className="text-ink">Katalog</span>
-      </p>
+      <Breadcrumb items={[{ href: "/", label: "Beranda" }, { label: "Katalog" }]} />
       <h1 className="mt-2 text-4xl font-extrabold lg:text-5xl">Katalog Produk</h1>
       <p className="mt-3 text-lg text-muted">
         Menampilkan {items.length} dari {meta.total} produk

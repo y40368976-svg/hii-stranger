@@ -172,7 +172,7 @@ function Stok() {
             <Card>
               <EmptyState
                 title="Pilih produk"
-                description="Pilih produk di sebelah kiri untuk mengelola variannya."
+                description="Pilih produk dari daftar untuk mengelola variannya."
               />
             </Card>
           ) : (

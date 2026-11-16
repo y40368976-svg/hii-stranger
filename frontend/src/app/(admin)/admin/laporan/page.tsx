@@ -60,7 +60,7 @@ export default function LaporanPage() {
         ))}
       </div>
 
-      <Card title="Pendapatan per minggu" className="mt-7 p-8">
+      <Card title="Pendapatan per minggu" className="mt-7 sm:p-8">
         {!weeks.some(Boolean) ? (
           <p className="text-sm text-muted">
             Belum ada pendapatan pada periode ini.
@@ -96,9 +96,9 @@ export default function LaporanPage() {
         )}
       </Card>
 
-      <Card title="Ringkasan per produk" className="mt-7 p-8">
+      <Card title="Ringkasan per produk" className="mt-7 sm:p-8">
         <div className="overflow-x-auto rounded-xl border border-line-strong">
-          <table className={"w-full text-xs sm:min-w-480px " + stackTable}>
+          <table className={"w-full text-xs sm:min-w-120 " + stackTable}>
             <thead className={theadCls}>
               <tr>
                 {["Produk", "Terjual", "Pendapatan"].map((h) => (

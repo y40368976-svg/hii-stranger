@@ -48,14 +48,13 @@ export default function ServerGate({
       <Image
         src="/Logo.png"
         alt="Hii Stranger"
-        width={180}
-        height={160}
+        width={160} height={160}
         priority
       />
-      <h1 className="mt-8 max-w-640px text-3xl font-extrabold sm:text-5xl">
+      <h1 className="mt-8 max-w-160 text-3xl font-extrabold sm:text-5xl">
         Server tidak merespons
       </h1>
-      <p className="mt-6 max-w-580px text-base text-faint sm:text-xl">
+      <p className="mt-6 max-w-145 text-base text-faint sm:text-xl">
         Tidak bisa terhubung ke server. Periksa koneksi internetmu atau coba
         lagi beberapa saat lagi.
       </p>

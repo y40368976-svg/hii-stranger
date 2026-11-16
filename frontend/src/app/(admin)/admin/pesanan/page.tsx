@@ -69,7 +69,7 @@ export default function AdminPesananPage() {
         sub="Pesanan dari website Hii Stranger."
       />
       <div
-        className="mb-4 flex gap-3 overflow-x-auto pb-1"
+        className="no-scrollbar mb-4 flex gap-3 overflow-x-auto pb-1"
         role="tablist"
         aria-label="Filter status pesanan"
       >
@@ -110,7 +110,7 @@ export default function AdminPesananPage() {
         />
       </label>
       <div className="overflow-x-auto rounded-xl border border-line-strong bg-white">
-        <table className={"w-full text-xs sm:min-w-225 " + stackTable}>
+        <table className={"w-full text-xs sm:min-w-200 " + stackTable}>
           <thead className={theadCls}>
             <tr>
               {[
@@ -123,7 +123,7 @@ export default function AdminPesananPage() {
                 "Tujuan",
                 "",
               ].map((h, i) => (
-                <th key={i} className="px-5 py-4 font-semibold">
+                <th key={i} className="px-4 py-4 font-semibold">
                   {h}
                 </th>
               ))}
@@ -135,22 +135,22 @@ export default function AdminPesananPage() {
               const st = CUST_STATUS[o.order_status];
               return (
                 <tr key={o.id} className="border-t border-line-strong">
-                  <td className="px-5 py-3">#{o.order_number}</td>
-                  <td data-l="Tanggal" className="px-5 py-3">
+                  <td className="px-4 py-3">#{o.order_number}</td>
+                  <td data-l="Tanggal" className="px-4 py-3">
                     {formatDate(o.created_at)}
                   </td>
-                  <td data-l="Pelanggan" className="px-5 py-3 font-semibold">
+                  <td data-l="Pelanggan" className="px-4 py-3 font-semibold">
                     {o.recipient_name}
                   </td>
-                  <td data-l="Total" className="px-5 py-3">
+                  <td data-l="Total" className="px-4 py-3">
                     {formatRupiah(o.total_amount)}
                   </td>
-                  <td data-l="Pembayaran" className="px-5 py-3">
+                  <td data-l="Pembayaran" className="px-4 py-3">
                     <Badge tone={pay.tone} className="px-2 py-0.5 text-[10px]">
                       {pay.label}
                     </Badge>
                   </td>
-                  <td data-l="Status" className="px-5 py-3">
+                  <td data-l="Status" className="px-4 py-3">
                     <span
                       className={cn(
                         "rounded-full px-2 py-0.5 text-[10px] font-bold",
@@ -160,10 +160,10 @@ export default function AdminPesananPage() {
                       {st?.label ?? o.order_status}
                     </span>
                   </td>
-                  <td data-l="Tujuan" className="px-5 py-3">
+                  <td data-l="Tujuan" className="px-4 py-3">
                     {o.shipping_city ?? "-"}
                   </td>
-                  <td className="px-5 py-3 text-right">
+                  <td className="px-4 py-3 text-right">
                     <Link href={"/admin/pesanan/" + o.id} className={btnLine}>
                       Detail
                     </Link>

@@ -212,12 +212,15 @@ function Pembayaran() {
             </p>
           </Card>
         ) : (
+          // Tanpa antrean, ajakan "pilih dari daftar" tidak relevan (daftar sudah menampilkan pesan kosong).
+          !!list?.length && (
           <Card>
             <EmptyState
               title="Pilih pembayaran"
-              description="Pilih pesanan di sebelah kiri untuk memeriksa bukti bayar."
+              description="Pilih pesanan dari daftar untuk memeriksa bukti bayar."
             />
           </Card>
+          )
         )}
       </div>
     </div>

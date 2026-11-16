@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Pencil, Plus, Search } from "lucide-react";
 import {
+  AvailBadge,
   Card,
   PageHead,
   Thumb,
@@ -221,11 +222,7 @@ export default function AdminProdukPage() {
                     <td data-l="Harga" className="px-5 py-5">{formatRupiah(p.price)}</td>
                     <td data-l="Stok" className="px-5 py-5">{p.total_stock ?? 0}</td>
                     <td data-l="Jenis" className="px-5 py-5">
-                      <span className="rounded-full bg-ink px-2.5 py-1 font-bold text-white">
-                        {p.availability_type === "preorder"
-                          ? "Pre-Order"
-                          : "Ready Stock"}
-                      </span>
+                      <AvailBadge type={p.availability_type} days={p.po_estimate_days} />
                     </td>
                     <td data-l="Status" className="px-5 py-5">
                       <Toggle

@@ -98,7 +98,7 @@ export default function MaintenancePage() {
           <div className="grid min-h-40 place-items-center rounded-xl bg-[#d9d9d9] p-6 text-center text-sm">
             {msg.trim() || "Website sedang dalam perbaikan."}
           </div>
-          <p className="mt-5 rounded-xl bg-canvas px-12 py-3 text-xs text-muted">Jika penyimpanan gagal, status sebelumnya dipertahankan.</p>
+          <p className="mt-5 rounded-xl bg-canvas px-4 py-3 text-xs text-muted xl:px-12">Jika penyimpanan gagal, status sebelumnya dipertahankan.</p>
         </Card>
       </div>
     </div>
