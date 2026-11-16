@@ -1,21 +1,78 @@
-# Security Policy
+# Kebijakan Keamanan
 
-## Supported Versions
+Dokumen ini menjelaskan versi yang didukung, cara melaporkan kerentanan, dan
+kontrol keamanan yang sudah berjalan pada proyek **Hii Stranger**.
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+## Versi yang Didukung
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+Proyek ini dikembangkan sebagai satu aplikasi aktif (backend Go + frontend Next.js).
+Pembaruan keamanan hanya diberikan untuk kode pada branch `main` terbaru.
 
-## Reporting a Vulnerability
+| Versi | Didukung |
+| ----- | -------- |
+| `main` (terbaru) | :white_check_mark: |
+| Commit/branch lama | :x: |
 
-Use this section to tell people how to report a vulnerability.
+## Melaporkan Kerentanan
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+**Jangan** membuka Issue publik untuk kerentanan keamanan, karena Issue dapat
+dibaca siapa saja.
+
+Gunakan salah satu jalur privat berikut:
+
+1. **GitHub Private Vulnerability Reporting** — buka tab **Security** repositori,
+   lalu **Report a vulnerability**. Laporan hanya terlihat oleh pengelola.
+2. **Kontak langsung** — hubungi pengelola di [email/kontak kelompok] (lihat `AUTHORS.md`).
+
+Sertakan sebisanya:
+
+- Deskripsi kerentanan dan dampaknya.
+- Langkah reproduksi atau proof of concept.
+- Komponen yang terdampak (endpoint, file, atau versi).
+- Saran perbaikan bila ada.
+
+## Waktu Tanggapan
+
+| Tahap | Target |
+| ----- | ------ |
+| Konfirmasi laporan diterima | dalam 3 hari kerja |
+| Penilaian awal & tingkat keparahan | dalam 7 hari kerja |
+| Perbaikan untuk kerentanan terkonfirmasi | sesuai tingkat keparahan |
+
+Jika laporan diterima, kami akan mengabari perkembangan perbaikan dan memberi
+kredit kepada pelapor bila diinginkan. Jika ditolak, kami jelaskan alasannya.
+
+## Cakupan
+
+**Termasuk:** kode di `backend/` dan `frontend/`, spesifikasi API
+(`backend/api/openapi.yaml`), serta konfigurasi deployment di repositori ini.
+
+**Tidak termasuk:** kerentanan pada dependensi pihak ketiga (laporkan ke proyek
+terkait; penanganan versinya dikelola lewat Dependabot), serta layanan eksternal
+(Cloudinary, RajaOngkir, penyedia email/basis data).
+
+## Kontrol Keamanan yang Berjalan
+
+Pemindaian otomatis pada CI (`.github/workflows/`):
+
+- **CodeQL** — analisis kode statis untuk Go dan JavaScript/TypeScript.
+- **govulncheck** — memblokir build bila ada CVE Go yang benar-benar terpanggil.
+- **gosec** — pemindai masalah keamanan kode Go (mode laporan).
+- **Dependabot** — pembaruan dependensi mingguan + peringatan kerentanan.
+- **gitleaks** — deteksi rahasia/kredensial yang ikut ter-commit.
+- **pnpm audit** — audit kerentanan dependensi frontend (level high, produksi).
+
+Kontrol pada aplikasi (middleware backend):
+
+- Security headers (`securityheaders.go`).
+- Pembatasan laju permintaan / rate limit (`ratelimit.go`).
+- Pembatasan ukuran body & CORS (`limits.go`, `cors.go`).
+- Pemulihan panic agar proses tidak tumbang (`recover.go`).
+- Autentikasi berbasis token dan pemisahan peran admin.
+
+## Pengungkapan yang Bertanggung Jawab
+
+Kami menghargai pelaporan yang bertanggung jawab. Selama Anda menguji tanpa
+merusak data, mengakses data pengguna lain, atau mengganggu layanan, dan memberi
+kami waktu wajar untuk memperbaiki sebelum mengungkap ke publik, kami tidak akan
+menempuh tindakan hukum atas pengujian keamanan yang beritikad baik.
