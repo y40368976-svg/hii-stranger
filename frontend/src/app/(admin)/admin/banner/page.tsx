@@ -201,7 +201,7 @@ export default function BannerPage() {
               {preview ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={preview}
+                  src={encodeURI(preview)}
                   alt="Pratinjau banner"
                   className="max-h-48 w-full object-cover"
                 />
