@@ -127,8 +127,9 @@ export default function AdminLayout({
         href={n.href}
         onClick={() => setOpen(false)}
         aria-current={active ? "page" : undefined}
+        title={n.label}
         className={cn(
-          "relative flex shrink-0 items-center gap-3 rounded-xl px-5 py-3 font-semibold sm:max-lg:justify-center sm:max-lg:px-0",
+          "relative flex shrink-0 items-center gap-3 rounded-xl px-5 py-2.5 font-semibold sm:max-lg:justify-center sm:max-lg:px-0",
           active ? "bg-lime text-ink" : "text-faint hover:text-white",
         )}
       >
@@ -159,7 +160,7 @@ export default function AdminLayout({
       )}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-68.25 overflow-y-auto bg-ink px-6 py-7 transition-transform sm:sticky sm:top-0 sm:z-auto sm:h-screen sm:w-90px sm:shrink-0 sm:translate-x-0 sm:px-3 lg:w-273px lg:px-6",
+          "fixed inset-y-0 left-0 z-40 w-68.25 overflow-y-auto bg-ink px-6 py-7 transition-transform sm:sticky sm:top-0 sm:z-auto sm:h-screen sm:w-22.5 sm:shrink-0 sm:translate-x-0 sm:px-3 lg:w-68.25 lg:px-6",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -170,13 +171,11 @@ export default function AdminLayout({
           <Image
             src="/Logo.png"
             alt="Hii Stranger"
-            width={84}
-            height={74}
-            className="height: 74px w-auto sm:max-lg:h-10"
+            width={64} height={64} className="size-16 sm:max-lg:size-10"
             priority
           />
         </Link>
-        <nav aria-label="Menu admin" className="mt-7 flex flex-col gap-2">
+        <nav aria-label="Menu admin" className="mt-5 flex flex-col gap-1">
           {NAV.map(item)}
           {isAdmin && (
             <>
@@ -188,7 +187,8 @@ export default function AdminLayout({
           )}
           <button
             onClick={() => logout()}
-            className="flex shrink-0 items-center gap-3 rounded-xl px-5 py-3 font-semibold text-faint hover:text-white sm:max-lg:justify-center sm:max-lg:px-0 lg:mt-6"
+            title="Keluar"
+            className="flex shrink-0 items-center gap-3 rounded-xl px-5 py-2.5 font-semibold text-faint hover:text-white sm:max-lg:justify-center sm:max-lg:px-0 lg:mt-3"
           >
             <LogOut className="size-4 sm:max-lg:size-5" aria-hidden />{" "}
             <span className="sm:max-lg:sr-only">Keluar</span>
@@ -207,13 +207,13 @@ export default function AdminLayout({
           </button>
           <p className="flex-1 text-sm font-semibold sm:flex-none sm:truncate sm:text-lg">
             <span className="text-muted">
-              {isAdmin ? "Area Owner" : "Area Admin"} /{" "}
+              {isAdmin ? "Area Owner" : "Area Staff"} /{" "}
             </span>
             {title}
           </p>
           <div className="flex items-center gap-3">
             <span className="rounded-full bg-ink px-3 py-0.5 text-xs font-semibold text-lime sm:text-base sm:text-white">
-              {isAdmin ? "Owner" : "Admin"}
+              {isAdmin ? "Owner" : "Staff"}
             </span>
             <span
               className="hidden size-12 place-items-center sm:grid rounded-full bg-lime text-lg font-bold"

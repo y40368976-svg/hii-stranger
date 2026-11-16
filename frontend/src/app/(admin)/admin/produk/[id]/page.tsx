@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Info, Upload, X } from "lucide-react";
 import {
+  AvailBadge,
   Card,
   PageHead,
   Thumb,
@@ -326,11 +327,7 @@ export default function AdminProdukForm() {
           </Card>
           {p && (
             <Card title="Ketersediaan">
-              <span className="rounded-full bg-stone px-2 py-1 text-[10px] font-bold text-ink-3">
-                {p.availability_type === "preorder"
-                  ? "Pre-Order"
-                  : "Ready Stock"}
-              </span>
+              <AvailBadge type={p.availability_type} days={p.po_estimate_days} />
               <Link
                 href={"/admin/ketersediaan?id=" + p.id}
                 className={btnLine + " mt-3 block text-center"}
@@ -352,7 +349,7 @@ export default function AdminProdukForm() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 flex justify-end gap-6 border-t border-line bg-white px-4 py-4 sm:left-22.5 sm:px-6 lg:left-273px lg:px-10">
+      <div className="fixed inset-x-0 bottom-0 flex justify-end gap-6 border-t border-line bg-white px-4 py-4 sm:left-22.5 sm:px-6 lg:left-68.25 lg:px-10">
         <Link
           href="/admin/produk"
           className="self-center font-semibold underline"

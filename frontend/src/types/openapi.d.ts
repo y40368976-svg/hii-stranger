@@ -1577,8 +1577,12 @@ export interface components {
         OrderCreate: {
             recipient_name: string;
             recipient_phone: string;
-            /** @description Nama jalan, nomor rumah, RT/RW. */
+            /** @description Nama jalan dan nomor rumah. */
             shipping_address: string;
+            /** @description Wajib. Digabung ke shipping_address sebagai "RT 001/RW 002". */
+            rt: string;
+            /** @description Wajib. Digabung ke shipping_address. */
+            rw: string;
             /** @description ID dari `/regions/provinces`. */
             province_id: number;
             /** @description ID dari `/regions/provinces/{provinceId}/cities`. */
@@ -1619,7 +1623,7 @@ export interface components {
             /** @description Diturunkan dari keberadaan `proof_data`. */
             readonly has_proof: boolean;
             /**
-             * @description `pending` = menunggu bukti atau menunggu verifikasi (lihat `has_proof`).
+             * @description `menunggu` = menunggu bukti atau menunggu verifikasi (lihat `has_proof`).
              * @enum {string}
              */
             status: "menunggu" | "valid" | "ditolak";
@@ -1749,7 +1753,7 @@ export interface components {
         /** @enum {string} */
         Role: "customer" | "staff" | "owner";
         VerifyEmailRequest: {
-            /** @description Token dari tautan `/verify-email?token=...` di email. */
+            /** @description Token dari tautan `/verifikasi-email?token=...` di email. */
             token: string;
         };
         ForgotPasswordRequest: {

@@ -146,7 +146,7 @@ export default function PembayaranPage() {
               </div>
             )}
             {err && pay && <p role="alert" className="mt-3 text-xs text-danger">{err}</p>}
-            <button onClick={send} disabled={!file || busy} className="mt-4 h-8.5 w-full rounded-lg bg-lime text-xs font-bold disabled:opacity-50">
+            <button onClick={send} disabled={!file || busy} className="mt-4 h-12 w-full rounded-xl bg-lime text-sm font-bold disabled:opacity-50">
               {busy ? "Mengirim..." : "Kirim Bukti Pembayaran"}
             </button>
           </section>

@@ -104,8 +104,8 @@ export type CheckoutInput = {
   recipient_name: string;
   recipient_phone: string;
   shipping_address: string;
-  rt?: string;
-  rw?: string;
+  rt: string;
+  rw: string;
   province_id: number;
   city_id: number;
   district_id: number;
