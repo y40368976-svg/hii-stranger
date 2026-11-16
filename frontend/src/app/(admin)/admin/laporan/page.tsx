@@ -15,7 +15,10 @@ export default function LaporanPage() {
   const [a, setA] = useState<ApiAnalytics | null>(null);
 
   useEffect(() => {
-    adminService.analytics(days).then(setA).catch((e) => toast.error(errorMessage(e)));
+    adminService
+      .analytics(days)
+      .then(setA)
+      .catch((e) => toast.error(errorMessage(e)));
   }, [days]);
 
   const revenue = Number(a?.current.revenue ?? 0);
@@ -45,7 +48,10 @@ export default function LaporanPage() {
         {[
           ["Total pendapatan", formatRupiah(revenue)],
           ["Jumlah pesanan", String(orders)],
-          ["Rata-rata per pesanan", formatRupiah(orders ? revenue / orders : 0)],
+          [
+            "Rata-rata per pesanan",
+            formatRupiah(orders ? revenue / orders : 0),
+          ],
         ].map(([k, v]) => (
           <Card key={k}>
             <p className="font-semibold text-ink-3">{k}</p>
@@ -56,16 +62,26 @@ export default function LaporanPage() {
 
       <Card title="Pendapatan per minggu" className="mt-7 p-8">
         {!weeks.some(Boolean) ? (
-          <p className="text-sm text-muted">Belum ada pendapatan pada periode ini.</p>
+          <p className="text-sm text-muted">
+            Belum ada pendapatan pada periode ini.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <ul className="mx-auto flex h-52 w-max items-end gap-10 border-b border-ink px-10">
               {weeks.map((w, i) => (
-                <li key={i} className="flex h-full w-20 flex-col justify-end" title={formatRupiah(w)}>
+                <li
+                  key={i}
+                  className="flex h-full w-20 flex-col justify-end"
+                  title={formatRupiah(w)}
+                >
                   <span className="sr-only">
                     Minggu {i + 1}: {formatRupiah(w)}
                   </span>
-                  <span className="rounded-t-xl bg-[#d9d9d9]" style={{ height: Math.max(2, (w / max) * 100) + "%" }} aria-hidden />
+                  <span
+                    className="rounded-t-xl bg-[#d9d9d9]"
+                    style={{ height: Math.max(2, (w / max) * 100) + "%" }}
+                    aria-hidden
+                  />
                 </li>
               ))}
             </ul>
@@ -82,7 +98,7 @@ export default function LaporanPage() {
 
       <Card title="Ringkasan per produk" className="mt-7 p-8">
         <div className="overflow-x-auto rounded-xl border border-line-strong">
-          <table className={"w-full text-xs sm:min-w-[480px] " + stackTable}>
+          <table className={"w-full text-xs sm:min-w-480px " + stackTable}>
             <thead className={theadCls}>
               <tr>
                 {["Produk", "Terjual", "Pendapatan"].map((h) => (
@@ -96,13 +112,21 @@ export default function LaporanPage() {
               {a?.top_products.map((t) => (
                 <tr key={t.product_id} className="border-t border-line-strong">
                   <td className="px-6 py-5 font-bold">{t.name}</td>
-                  <td data-l="Terjual" className="px-6 py-5">{t.quantity} pcs</td>
-                  <td data-l="Pendapatan" className="px-6 py-5">{formatRupiah(t.revenue)}</td>
+                  <td data-l="Terjual" className="px-6 py-5">
+                    {t.quantity} pcs
+                  </td>
+                  <td data-l="Pendapatan" className="px-6 py-5">
+                    {formatRupiah(t.revenue)}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {a?.top_products.length === 0 && <p className="py-6 text-center text-sm text-muted">Belum ada penjualan.</p>}
+          {a?.top_products.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted">
+              Belum ada penjualan.
+            </p>
+          )}
         </div>
       </Card>
     </div>

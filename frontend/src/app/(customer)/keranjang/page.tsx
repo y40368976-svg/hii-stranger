@@ -43,7 +43,7 @@ export default function KeranjangPage() {
           <ul className="divide-y divide-line rounded-3xl border border-line bg-white px-3 py-2 sm:px-6 sm:py-4 lg:px-7">
             {items.map((i) => (
               <li key={i.id} className="grid items-center grid-cols-[auto_1fr_auto_auto_auto] gap-x-2 gap-y-3 py-4 sm:gap-x-3 lg:gap-x-6 lg:py-6">
-                <div className="size-[50px] shrink-0 sm:size-[58px] lg:size-[122px] overflow-hidden rounded-2xl bg-[#d9d9d9]">
+                <div className="size-12.5 shrink-0 sm:size-14.5 lg:size-30.5 overflow-hidden rounded-2xl bg-[#d9d9d9]">
                   {i.primary_image_url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={cdn(i.primary_image_url, 250)} alt={i.product_name} className="size-full object-cover" />
@@ -95,7 +95,7 @@ export default function KeranjangPage() {
             <button
               disabled={over || items.length === 0}
               onClick={() => router.push("/checkout")}
-              className="mt-4 flex h-[34px] w-full items-center justify-center gap-1 rounded-lg bg-lime text-xs font-bold disabled:opacity-50"
+              className="mt-4 flex h-8.5 w-full items-center justify-center gap-1 rounded-lg bg-lime text-xs font-bold disabled:opacity-50"
             >
               <ChevronRight className="size-3" /> Lanjut ke Pemesanan
             </button>

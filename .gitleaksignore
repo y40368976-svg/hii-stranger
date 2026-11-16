@@ -1,0 +1,2 @@
+# Kunci palsu khusus tes (riwayat lama, sebelum ditandai gitleaks:allow)
+51c32c0d3002cb8fb85a8b37ea71a0eea0465a87:backend/internal/pkg/token/token_test.go:generic-api-key:10

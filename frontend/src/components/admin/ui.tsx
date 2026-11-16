@@ -4,7 +4,7 @@ import { cdn } from "@/lib/img";
 
 /** Kelas bersama back-office (desain admin). */
 export const inputCls =
-  "h-[34px] w-full rounded-lg border border-line-strong bg-white px-3 text-sm focus:outline-2 focus:outline-ink disabled:bg-stone";
+  "h-8.5 w-full rounded-lg border border-line-strong bg-white px-3 text-sm focus:outline-2 focus:outline-ink disabled:bg-stone";
 export const labelCls = "mb-2 block text-sm font-semibold";
 export const btnLime = "rounded-lg bg-lime px-4 py-2 text-sm font-bold text-ink disabled:opacity-50";
 export const btnLine = "rounded-lg border border-ink bg-white px-4 py-2 text-xs font-bold disabled:opacity-50";

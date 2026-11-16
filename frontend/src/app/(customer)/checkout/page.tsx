@@ -248,7 +248,7 @@ export default function CheckoutPage() {
           <ul className="mt-5 space-y-4">
             {items.map((i) => (
               <li key={i.id} className="flex items-center gap-4">
-                <div className="size-[50px] shrink-0 overflow-hidden rounded-lg bg-[#d9d9d9]">
+                <div className="size-12.5 shrink-0 overflow-hidden rounded-lg bg-[#d9d9d9]">
                   {i.primary_image_url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={cdn(i.primary_image_url, 100)} alt="" className="size-full object-cover" />
@@ -281,7 +281,7 @@ export default function CheckoutPage() {
               {apiErr}
             </p>
           )}
-          <button disabled={busy || !quote} className="mt-4 h-[34px] w-full rounded-lg bg-lime text-xs font-bold disabled:opacity-50">
+          <button disabled={busy || !quote} className="mt-4 h-8.5 w-full rounded-lg bg-lime text-xs font-bold disabled:opacity-50">
             {busy ? "Memproses..." : "Buat Pesanan"}
           </button>
           <p className="mt-3 text-[10px] text-muted">Pembayaran melalui QRIS dan diverifikasi manual oleh Admin.</p>

@@ -28,26 +28,53 @@ export default function LupaSandiPage() {
   }
 
   return (
-    <AuthShell headline={<>Lupa kata sandi?<br />Tenang.</>}>
+    <AuthShell
+      headline={
+        <>
+          Lupa kata sandi?
+          <br />
+          Tenang.
+        </>
+      }
+    >
       <h1 className="text-5xl font-extrabold">Lupa Kata Sandi</h1>
       {sent ? (
         <>
           <p className="mt-3 text-muted">
-            Bila <b className="text-ink">{sent}</b> terdaftar, tautan atur ulang kata sandi sudah dikirim. Tautan hanya berlaku sebentar.
+            Bila <b className="text-ink">{sent}</b> terdaftar, tautan atur ulang
+            kata sandi sudah dikirim. Tautan hanya berlaku sebentar.
           </p>
-          <p className="mt-4 rounded-xl bg-stone p-4 text-sm">Tidak ada di kotak masuk? Cek folder Spam atau Promosi.</p>
+          <p className="mt-4 rounded-xl bg-stone p-4 text-sm">
+            Tidak ada di kotak masuk? Cek folder Spam atau Promosi.
+          </p>
         </>
       ) : (
         <>
-          <p className="mt-1 text-muted">Masukkan email akunmu, kami kirim tautan untuk membuat kata sandi baru.</p>
+          <p className="mt-1 text-muted">
+            Masukkan email akunmu, kami kirim tautan untuk membuat kata sandi
+            baru.
+          </p>
           {err && (
-            <p role="alert" className="mt-4 rounded-xl bg-danger-soft p-4 text-danger">
+            <p
+              role="alert"
+              className="mt-4 rounded-xl bg-danger-soft p-4 text-danger"
+            >
               {err}
             </p>
           )}
           <form onSubmit={submit} className="mt-6 space-y-4">
-            <Field label="Email" name="email" type="email" icon="user" autoComplete="email" required />
-            <button disabled={busy} className="mt-2 h-[60px] w-full rounded-xl bg-lime font-bold text-ink disabled:opacity-60">
+            <Field
+              label="Email"
+              name="email"
+              type="email"
+              icon="user"
+              autoComplete="email"
+              required
+            />
+            <button
+              disabled={busy}
+              className="mt-2 h-15 w-full rounded-xl bg-lime font-bold text-ink disabled:opacity-60"
+            >
               {busy ? "Mengirim..." : "Kirim tautan"}
             </button>
           </form>

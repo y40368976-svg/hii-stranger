@@ -164,7 +164,7 @@ function Ketersediaan() {
           <section>
             <h2 className="mb-3 text-lg font-bold">Semua produk</h2>
             <div className="overflow-x-auto rounded-xl border border-line-strong bg-white">
-              <table className={"w-full text-xs sm:min-w-[560px] " + stackTable}>
+              <table className={"w-full text-xs sm:min-w-140 " + stackTable}>
                 <thead className={theadCls}>
                   <tr>
                     {["Produk", "Jenis", "Estimasi PO", ""].map((h, i) => (
