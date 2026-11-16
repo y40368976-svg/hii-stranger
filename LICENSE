@@ -1,21 +1,29 @@
-HII STRANGER — PROPRIETARY SOFTWARE LICENSE
-Hak Cipta (c) 2026 Hii Stranger. Seluruh hak dilindungi undang-undang.
+HII STRANGER — LISENSI PERANGKAT LUNAK PROPRIETARY
+Hak Cipta (c) 2026 Kelompok 1 PPSI, Kelas 4KA21. Seluruh hak dilindungi undang-undang.
 
-Perangkat lunak ini, termasuk kode sumber backend dan frontend, skema basis data,
+Perangkat Lunak ini, termasuk kode sumber backend dan frontend, skema basis data,
 spesifikasi API (backend/api/openapi.yaml), desain antarmuka, dokumentasi, serta
-seluruh aset di repositori ini (selanjutnya "Perangkat Lunak") adalah milik
-eksklusif Hii Stranger dan bersifat RAHASIA.
+seluruh aset di repositori ini (selanjutnya "Perangkat Lunak") diciptakan dan
+dimiliki oleh Kelompok 1 PPSI 4KA21 (selanjutnya "Pengembang"). Daftar anggota
+Pengembang tercantum dalam AUTHORS.md.
 
-1. Tidak ada lisensi open source. Perangkat Lunak TIDAK dirilis di bawah lisensi
+1. Kepemilikan. Hak cipta dan seluruh hak kekayaan intelektual atas Perangkat Lunak
+   berada pada Pengembang. Tidak ada hak yang beralih ke pihak lain kecuali melalui
+   perjanjian tertulis yang ditandatangani oleh Pengembang.
+2. Tidak ada lisensi open source. Perangkat Lunak TIDAK dirilis di bawah lisensi
    open source apa pun (termasuk MIT, Apache, atau GPL).
-2. Penggunaan hanya diizinkan untuk karyawan, kontraktor, atau pihak lain yang
-   mendapat izin tertulis dari Hii Stranger, semata-mata untuk keperluan internal
-   Hii Stranger.
-3. Dilarang, tanpa izin tertulis: menyalin, mempublikasikan, mendistribusikan,
+3. Penggunaan oleh pihak yang memesan ("Klien") atas Perangkat Lunak hanya diizinkan
+   sejauh diberikan secara tertulis oleh Pengembang. Tanpa izin tertulis tersebut,
+   Klien tidak memperoleh hak untuk menggunakan, menyalin, atau menyebarkan Perangkat Lunak.
+4. Pengembangan lanjutan, modifikasi, pemeliharaan, atau pembuatan karya turunan atas
+   Perangkat Lunak hanya boleh dilakukan oleh Pengembang, atau oleh pihak ketiga yang
+   ditunjuk dengan persetujuan tertulis dari Pengembang. Klien tidak diperkenankan
+   menyerahkan Perangkat Lunak kepada pengembang lain tanpa persetujuan itu.
+5. Dilarang, tanpa izin tertulis Pengembang: menyalin, mempublikasikan, mendistribusikan,
    menyublisensikan, menjual, mengunggah ke repositori publik, atau membuat karya
-   turunan untuk pihak lain, baik sebagian maupun seluruhnya.
-4. Komponen pihak ketiga tetap tunduk pada lisensinya masing-masing; lihat
+   turunan, baik sebagian maupun seluruhnya.
+6. Komponen pihak ketiga tetap tunduk pada lisensinya masing-masing; lihat
    THIRD_PARTY_NOTICES.md. Lisensi ini tidak mengubah hak pemilik komponen tersebut.
-5. Perangkat Lunak disediakan "SEBAGAIMANA ADANYA" tanpa jaminan apa pun.
+7. Perangkat Lunak disediakan "SEBAGAIMANA ADANYA" tanpa jaminan apa pun.
 
-Pertanyaan perizinan: hubungi pemilik Hii Stranger.
+Pertanyaan perizinan: hubungi Kelompok 1 PPSI 4KA21 (lihat AUTHORS.md).
