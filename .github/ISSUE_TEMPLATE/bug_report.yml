@@ -1,0 +1,30 @@
+name: Laporan Bug
+description: Laporkan perilaku yang salah
+labels: ["bug"]
+body:
+  - type: textarea
+    id: deskripsi
+    attributes:
+      label: Deskripsi
+      description: Apa yang terjadi vs yang diharapkan.
+    validations: { required: true }
+  - type: textarea
+    id: reproduksi
+    attributes:
+      label: Langkah reproduksi
+      placeholder: |
+        1. Buka ...
+        2. Klik ...
+        3. Muncul ...
+    validations: { required: true }
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [backend, frontend, deployment, lainnya]
+    validations: { required: true }
+  - type: textarea
+    id: lingkungan
+    attributes:
+      label: Lingkungan
+      description: Browser/OS/versi bila relevan.
