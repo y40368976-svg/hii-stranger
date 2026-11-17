@@ -1,37 +1,5 @@
 [
   {
-    "label": "START SEMUA dev (redis + air + pnpm dev)",
-    "command": "pwsh -NoProfile -File .zed/dev.ps1 start dev",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "START SEMUA build (redis + api.exe + pnpm start)",
-    "command": "pwsh -NoProfile -File .zed/dev.ps1 start build",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "STOP SEMUA (frontend + backend + redis)",
-    "command": "pwsh -NoProfile -File .zed/dev.ps1 stop",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "save": "none",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "CEK SEMUA (vet+test+lint+tsc+vitest)",
-    "command": "Push-Location backend; make vet 2>&1 | Select-Object -Last 20; go test -p 1 -parallel 1 ./... 2>&1 | Where-Object { $_ -notmatch '^(ok|\\?)\\s' } | Select-Object -Last 30; Pop-Location; Push-Location frontend; pnpm lint 2>&1 | Select-Object -Last 25; pnpm exec tsc --noEmit 2>&1 | Select-String 'error TS' | Select-Object -First 20; pnpm test 2>&1 | Select-Object -Last 25; Pop-Location; 'SELESAI'",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
     "label": "backend: dev (air, hot reload)",
     "command": "air",
     "cwd": "$ZED_WORKTREE_ROOT/backend",
@@ -58,70 +26,6 @@
     "show_command": false
   },
   {
-    "label": "backend: stop API (port 8080)",
-    "command": "Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; 'port 8080 bebas'",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "save": "none",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "backend: fmt",
-    "command": "make fmt 2>&1 | Select-Object -Last 10",
-    "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "backend: vet",
-    "command": "make vet 2>&1 | Select-Object -Last 20",
-    "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "backend: lint (golangci-lint)",
-    "command": "golangci-lint run ./... 2>&1 | Select-Object -Last 25",
-    "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "backend: test (hanya gagal)",
-    "command": "go test -p 1 -parallel 1 ./... 2>&1 | Where-Object { $_ -notmatch '^(ok|\\?)\\s' } | Select-Object -Last 30",
-    "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "backend: test package file ini",
-    "command": "go test -p 1 -parallel 1 -count=1 . 2>&1 | Select-Object -Last 30",
-    "cwd": "$ZED_DIRNAME",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "backend: test fungsi di kursor",
-    "command": "go test -p 1 -parallel 1 -count=1 -v -run \"^$ZED_SYMBOL$\" . 2>&1 | Select-Object -Last 40",
-    "cwd": "$ZED_DIRNAME",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "backend: test integrasi cart (butuh TEST_DATABASE_URL)",
-    "command": "if (-not $env:TEST_DATABASE_URL) { 'Set dulu: $env:TEST_DATABASE_URL (DB uji, bukan produksi)' } else { go test -p 1 -parallel 1 -count=1 -tags integration ./internal/app/api/cart/ 2>&1 | Select-Object -Last 30 }",
-    "cwd": "$ZED_WORKTREE_ROOT/backend",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
     "label": "frontend: dev server",
     "command": "pnpm dev",
     "cwd": "$ZED_WORKTREE_ROOT/frontend",
@@ -140,91 +44,10 @@
     "show_command": false
   },
   {
-    "label": "frontend: stop dev server (port 3000)",
-    "command": "Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; 'port 3000 bebas'",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "save": "none",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "frontend: lint",
-    "command": "pnpm lint 2>&1 | Select-Object -Last 25",
-    "cwd": "$ZED_WORKTREE_ROOT/frontend",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "frontend: typecheck",
-    "command": "pnpm exec tsc --noEmit 2>&1 | Select-String 'error TS' | Select-Object -First 20",
-    "cwd": "$ZED_WORKTREE_ROOT/frontend",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
     "label": "frontend: build",
     "command": "pnpm build 2>&1 | Select-Object -Last 25",
     "cwd": "$ZED_WORKTREE_ROOT/frontend",
     "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "frontend: generate tipe API",
-    "command": "pnpm gen:api 2>&1 | Select-Object -Last 15",
-    "cwd": "$ZED_WORKTREE_ROOT/frontend",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "frontend: test (semua)",
-    "command": "pnpm test 2>&1 | Select-Object -Last 40",
-    "cwd": "$ZED_WORKTREE_ROOT/frontend",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "frontend: test file ini",
-    "command": "pnpm exec vitest run (Split-Path \"$ZED_FILE\" -Leaf) 2>&1 | Select-Object -Last 40",
-    "cwd": "$ZED_WORKTREE_ROOT/frontend",
-    "save": "all",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "redis: start",
-    "command": "redis-server --port 6379",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "use_new_terminal": true,
-    "save": "none",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "redis: stop",
-    "command": "redis-cli -p 6379 shutdown 2>&1; 'redis mati'",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "save": "none",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "postgres: start",
-    "command": "pwsh -NoProfile -File .zed/dev.ps1 pg-start",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "save": "none",
-    "show_summary": false,
-    "show_command": false
-  },
-  {
-    "label": "postgres: stop",
-    "command": "pwsh -NoProfile -File .zed/dev.ps1 pg-stop",
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "save": "none",
     "show_summary": false,
     "show_command": false
   }
