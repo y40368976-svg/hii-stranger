@@ -4,7 +4,6 @@
     "**/node_modules",
     "**/.next",
     "**/dump.rdb",
-    "**/rules-direction",
     "**/*.tsbuildinfo"
   ],
   "languages": {
@@ -50,15 +49,5 @@
   },
   "inlay_hints": {
     "enabled": true
-  },
-  "diagnostics": {
-    "inline": {
-      "enabled": true
-    }
-  },
-  "git": {
-    "inline_blame": {
-      "enabled": true
-    }
   }
-}
+  }
