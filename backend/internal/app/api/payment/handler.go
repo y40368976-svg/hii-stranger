@@ -109,7 +109,6 @@ func (h *Handler) GetProof(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Header().Set("Content-Disposition", "inline")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(pr.Data); err != nil {
 		slog.DebugContext(r.Context(), "write payment proof", "error", err)
