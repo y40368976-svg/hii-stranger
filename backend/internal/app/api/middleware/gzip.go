@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"compress/gzip"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -19,7 +20,7 @@ func Gzip() Middleware {
 				return
 			}
 			w.Header().Add("Vary", "Accept-Encoding")
-			gw := &gzipWriter{ResponseWriter: w}
+			gw := &gzipWriter{ResponseWriter: w, out: w}
 			defer gw.close()
 			next.ServeHTTP(gw, r)
 		})
@@ -29,6 +30,7 @@ func Gzip() Middleware {
 type gzipWriter struct {
 	http.ResponseWriter
 	zw      *gzip.Writer
+	out     io.Writer // zw bila dikompres, selain itu writer asli
 	started bool
 }
 
@@ -43,6 +45,7 @@ func (g *gzipWriter) start() {
 		h.Set("Content-Encoding", "gzip")
 		g.zw = gzipPool.Get().(*gzip.Writer)
 		g.zw.Reset(g.ResponseWriter)
+		g.out = g.zw
 	}
 }
 
@@ -58,10 +61,7 @@ func (g *gzipWriter) WriteHeader(code int) {
 
 func (g *gzipWriter) Write(b []byte) (int, error) {
 	g.start()
-	if g.zw != nil {
-		return g.zw.Write(b)
-	}
-	return g.ResponseWriter.Write(b)
+	return g.out.Write(b)
 }
 
 func (g *gzipWriter) close() {
