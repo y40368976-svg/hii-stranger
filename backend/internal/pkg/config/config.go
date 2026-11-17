@@ -100,8 +100,8 @@ func Load() (Config, error) {
 		// Default 10 koneksi: hasil benchmark (4 core) paling stabil di kisaran
 		// 2-3x jumlah core. Lebih banyak tidak menambah kecepatan karena
 		// PostgreSQL sendiri dibatasi CPU.
-		DBMaxConns:         int32(l.integer("DB_MAX_CONNS", 10, 32)),
-		DBMinConns:         int32(l.integer("DB_MIN_CONNS", 2, 32)),
+		DBMaxConns:         int32(l.integer("DB_MAX_CONNS", 10, 32)), // #nosec G115 -- ParseInt bitSize 32 menjamin muat int32
+		DBMinConns:         int32(l.integer("DB_MIN_CONNS", 2, 32)),  // #nosec G115 -- ParseInt bitSize 32 menjamin muat int32
 		DBStatementTimeout: l.duration("DB_STATEMENT_TIMEOUT", 5*time.Second),
 		JWTSecret:          l.required("JWT_SECRET"),
 		JWTIssuer:          l.required("JWT_ISSUER"),

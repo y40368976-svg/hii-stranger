@@ -57,10 +57,13 @@ Pemindaian otomatis pada CI (`.github/workflows/`):
 
 - **CodeQL** — analisis kode statis untuk Go dan JavaScript/TypeScript.
 - **govulncheck** — memblokir build bila ada CVE Go yang benar-benar terpanggil.
-- **gosec** — pemindai masalah keamanan kode Go (mode laporan).
+- **gosec** — pemindai masalah keamanan kode Go; memblokir build bila ada temuan.
 - **Dependabot** — pembaruan dependensi mingguan + peringatan kerentanan.
-- **gitleaks** — deteksi rahasia/kredensial yang ikut ter-commit.
+- **gitleaks** — deteksi rahasia/kredensial yang ikut ter-commit. Lokal: pasang
+  gitleaks lalu `git config core.hooksPath .githooks`; tanpa gitleaks, commit ditolak.
 - **pnpm audit** — audit kerentanan dependensi frontend (level high, produksi).
+
+Build Docker dan rilis (tag `v*`) hanya berjalan bila semua pemeriksaan di atas lulus.
 
 Kontrol pada aplikasi (middleware backend):
 
