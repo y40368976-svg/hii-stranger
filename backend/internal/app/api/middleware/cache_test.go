@@ -45,6 +45,9 @@ func newTestCache(t *testing.T) *ResponseCache {
 	defer cancel()
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		_ = rdb.Close()
+		if os.Getenv("CI") != "" {
+			t.Fatalf("redis wajib di CI (%s): %v", addr, err)
+		}
 		t.Skipf("redis tidak tersedia di %s: %v", addr, err)
 	}
 

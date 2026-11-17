@@ -9,17 +9,25 @@ permissions: { contents: read, pull-requests: read } # pull-requests: dibutuhkan
 jobs:
   backend:
     runs-on: ubuntu-latest
-    services: # Redis untuk test cache (REDIS_TEST_ADDR default localhost:6379)
+    services: # Redis (test cache) + Postgres (test integrasi); di CI test gagal, bukan skip, bila tidak tersedia
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: test }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 3s --health-retries 10
       redis:
         image: redis:7-alpine
         ports: ["6379:6379"]
         options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
     defaults: { run: { working-directory: backend } }
+    env: { TEST_DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test?sslmode=disable" }
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with: { go-version-file: backend/go.mod, cache-dependency-path: backend/go.sum }
+      - run: DB_URL="$TEST_DATABASE_URL" go run ./cmd/migration up
       - run: make vet test
+      - run: go test -tags integration -p 1 -count=1 ./internal/app/api/cart/
       - run: make sec
 
   frontend:
@@ -34,6 +42,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm exec tsc --noEmit
+      - run: pnpm test
       - run: pnpm audit --prod --audit-level high
 
   secrets:
