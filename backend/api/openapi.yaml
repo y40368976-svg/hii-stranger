@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: Hii Stranger Commerce API (Internal)
-  version: 1.2.8
+  version: 1.2.9
   license:
     name: Proprietary — seluruh hak dilindungi. Lihat berkas LICENSE di root repositori.
   x-confidentiality: internal
