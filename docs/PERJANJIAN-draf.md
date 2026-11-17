@@ -13,9 +13,7 @@ Pengembang sampai dialihkan melalui perjanjian tertulis yang ditandatangani
 Pengembang. Tidak ada pengalihan hak yang terjadi secara diam-diam.
 
 ## 2. Hak Pakai Klien
-Klien memperoleh hak untuk menggunakan perangkat lunak untuk operasional internal
-[sebutkan cakupan], dengan syarat [mis. pelunasan biaya / pencantuman atribusi].
-Hak pakai ini tidak mencakup hak untuk memodifikasi sumber atau mengalihkannya.
+Klien memperoleh hak pakai (lisensi) yang bersifat non-eksklusif, tidak dapat dipindahtangankan, dan tidak dapat disublisensikan untuk mengoperasikan dan mengelola website e-commerce ini semata-mata untuk kepentingan penjualan serta operasional toko milik Klien sendiri pada cakupan dengan syarat wajib mempertahankan dan menghapus maupun mengubahnya. Hak pakai ini hanya berlaku untuk operasional bisnis Klien yang bersangkutan dan secara tegas melarang Klien untuk menjual, menyewakan, meminjamkan, menduplikasi, maupun mengalihkan hak pakai, akun utama, dan akses sistem website ini kepada pihak lain mana pun, serta tidak mencakup hak untuk mengakses atau memodifikasi kode sumber (source code) tanpa persetujuan tertulis dari Pengembang. Seluruh hak cipta, kode sumber, dan kepemilikan atas sistem website ini sepenuhnya tetap menjadi milik Pengembang.
 
 ## 3. Pemeliharaan & Pengembangan Lanjutan
 Pemeliharaan, perbaikan, dan pengembangan lanjutan dikerjakan oleh Pengembang.
@@ -33,4 +31,4 @@ Atribusi "Dikembangkan oleh Kelompok 1 PPSI 4KA21" pada LICENSE, AUTHORS.md, dan
 antarmuka perangkat lunak tidak boleh dihapus tanpa persetujuan tertulis Pengembang.
 
 Ditandatangani,  
-Pengembang: ______________    Klien: ______________    Tanggal: __________
+Pengembang: Maulana Nur Anfajm    Klien: ______________    Tanggal: __________
