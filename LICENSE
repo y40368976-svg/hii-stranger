@@ -1,10 +1,12 @@
 HII STRANGER — LISENSI PERANGKAT LUNAK PROPRIETARY
-Hak Cipta (c) 2026 Kelompok 1 PPSI, Kelas 4KA21. Seluruh hak dilindungi undang-undang.
+Hak Cipta (c) 2026 Anggia Rahmani Syahdioanto, Hanif Fityatal Haq, Maulana Nur Anfajm, dan Sabrina Lulu Yunisa
+(Kelompok 1 PPSI, Kelas 4KA21). Seluruh hak dilindungi Undang-Undang Nomor 28 Tahun 2014
+tentang Hak Cipta.
 
 Perangkat Lunak ini, termasuk kode sumber backend dan frontend, skema basis data,
 spesifikasi API (backend/api/openapi.yaml), desain antarmuka, dokumentasi, serta
 seluruh aset di repositori ini (selanjutnya "Perangkat Lunak") diciptakan dan
-dimiliki oleh Kelompok 1 PPSI 4KA21 (selanjutnya "Pengembang"). Daftar anggota
+dimiliki bersama oleh para anggota Kelompok 1 PPSI 4KA21 (selanjutnya "Pengembang"). Daftar anggota
 Pengembang tercantum dalam AUTHORS.md.
 
 1. Kepemilikan. Hak cipta dan seluruh hak kekayaan intelektual atas Perangkat Lunak
@@ -24,6 +26,11 @@ Pengembang tercantum dalam AUTHORS.md.
    turunan, baik sebagian maupun seluruhnya.
 6. Komponen pihak ketiga tetap tunduk pada lisensinya masing-masing; lihat
    THIRD_PARTY_NOTICES.md. Lisensi ini tidak mengubah hak pemilik komponen tersebut.
-7. Perangkat Lunak disediakan "SEBAGAIMANA ADANYA" tanpa jaminan apa pun.
+7. Perangkat Lunak disediakan "SEBAGAIMANA ADANYA" tanpa jaminan apa pun. Sejauh diizinkan
+   hukum, Pengembang tidak bertanggung jawab atas kerugian yang timbul dari penggunaannya.
+8. Repositori yang dapat dilihat publik tidak berarti pemberian lisensi. Melihat kode
+   tidak memberi hak selain yang diizinkan hukum (misalnya Pasal 43-51 UU Hak Cipta).
+9. Lisensi ini tunduk pada hukum Republik Indonesia. Pelanggaran hak cipta dapat
+   dikenai sanksi menurut Pasal 113 UU Nomor 28 Tahun 2014.
 
 Pertanyaan perizinan: hubungi Kelompok 1 PPSI 4KA21 (lihat AUTHORS.md).

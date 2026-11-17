@@ -23,12 +23,23 @@ ke pihak lain, berlaku ketentuan Pasal 4.
 
 ## 4. Transfer / Serah Terima
 Pengalihan kode sumber dan hak pengembangan kepada pihak lain hanya sah bila:
-(a) disepakati tertulis oleh Pengembang
+(a) disepakati tertulis oleh Pengembang; dan
+(b) dituangkan dalam perjanjian pengalihan hak cipta tertulis sesuai Pasal 16 ayat (2) UU Nomor 28 Tahun 2014.
 Sebelum syarat ini terpenuhi, hak pengembangan tetap eksklusif pada Pengembang.
 
 ## 5. Atribusi
 Atribusi "Dikembangkan oleh Kelompok 1 PPSI 4KA21" pada LICENSE, AUTHORS.md, dan
 antarmuka perangkat lunak tidak boleh dihapus tanpa persetujuan tertulis Pengembang.
 
+## 6. Data Pribadi
+Klien adalah pengendali data pribadi pelanggan website dan bertanggung jawab atas
+pemrosesannya sesuai UU Nomor 27 Tahun 2022 tentang Pelindungan Data Pribadi. Pengembang
+hanya mengakses data tersebut sejauh perlu untuk pemeliharaan dan wajib menjaga kerahasiaannya.
+
+## 7. Hukum yang Berlaku & Sengketa
+Perjanjian ini tunduk pada hukum Republik Indonesia. Sengketa diselesaikan lebih dulu
+secara musyawarah; jika dalam 30 hari tidak tercapai, melalui Pengadilan Niaga yang berwenang
+sesuai Pasal 95 UU Nomor 28 Tahun 2014.
+
 Ditandatangani,  
-Pengembang: Maulana Nur Anfajm    Klien: ______________    Tanggal: __________
+Pengembang: Maulana Nur Anfajm (mewakili seluruh anggota pada AUTHORS.md berdasarkan kuasa tertulis)    Klien: ______________    Tanggal: __________
