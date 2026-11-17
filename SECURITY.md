@@ -22,7 +22,7 @@ Gunakan salah satu jalur privat berikut:
 
 1. **GitHub Private Vulnerability Reporting** — buka tab **Security** repositori,
    lalu **Report a vulnerability**. Laporan hanya terlihat oleh pengelola.
-2. **Kontak langsung** — hubungi pengelola di [email/kontak kelompok] (lihat `AUTHORS.md`).
+2. **Kontak langsung** — hubungi pengelola di y40368976@gmail.com (lihat `AUTHORS.md`).
 
 Sertakan sebisanya:
 
