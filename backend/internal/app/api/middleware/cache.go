@@ -80,7 +80,7 @@ func (c *ResponseCache) Cached() Middleware {
 					h.Set("Content-Type", contentType)
 					h.Set("X-Cache", "HIT")
 					w.WriteHeader(http.StatusOK)
-					_, _ = w.Write(body)
+					_, _ = w.Write(body) // #nosec G705 -- replay respons handler sendiri dari Redis internal; nosniff dari SecurityHeaders
 					return
 				}
 			case !errors.Is(err, redis.Nil):

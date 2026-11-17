@@ -2,6 +2,7 @@ name: ci
 on:
   push: { branches: [main] }
   pull_request:
+  workflow_call: # dipakai release.yml: tag tidak dirilis bila CI gagal
   schedule: [{ cron: "0 2 * * 1" }] # Senin: dependency baru bisa kena CVE tanpa ada commit
 permissions: { contents: read, pull-requests: read } # pull-requests: dibutuhkan gitleaks-action
 
@@ -44,6 +45,7 @@ jobs:
         env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
 
   docker:
+    needs: [backend, frontend, secrets] # jangan build bila ada yang gagal
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
